@@ -1,16 +1,16 @@
-public class quicksort {
+public class QuickSort {
     public static void quicksort(int a[], int l, int r) {
         if (l < r) {
             int i = l, j = r, x = a[l];
             while (i < j) {
-                // 从右向左找第一个小于x的数
+                // 浠庡彸鍚戝乏鎵剧涓�涓皬浜巟鐨勬暟
                 while (i < j && a[j] >= x)
                     j--;
 
                 if (i < j)
                     a[i++] = a[j];
 
-                // 从左向右找第一个大于等于x的数
+                // 浠庡乏鍚戝彸鎵剧涓�涓ぇ浜庣瓑浜巟鐨勬暟
                 while (i < j && a[i] < x)
                     i++;
 
@@ -18,7 +18,7 @@ public class quicksort {
                     a[j--] = a[i];
             }
             a[i] = x;
-            quicksort(a, l, i - 1); // 递归调用
+            quicksort(a, l, i - 1); // 閫掑綊璋冪敤
             quicksort(a, i + 1, r);
         }
     }
