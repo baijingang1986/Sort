@@ -1,7 +1,7 @@
 import javax.swing.JInternalFrame;
 import javax.xml.transform.Templates;
 
-public class guibingsort {
+public class MergeSort {
     public static void mergeArray(int[] a, int first, int mid, int last) {
         int[] c = new int[a.length];
         int j = mid + 1;
