@@ -1,4 +1,4 @@
-public class shellsort {
+public class ShellSort {
     public static void shellSort(int[] a) {
         int d = a.length;
         int temp = 0;
@@ -16,7 +16,7 @@ public class shellsort {
         }
     }
     public static void shellSort1(int[] data) {
-        // ¼ÆËã³ö×î´óµÄhÖµ
+        // è®¡ç®—å‡ºæœ€å¤§çš„hå€¼
         int h = 1;
         while (h <= data.length / 3) {
             h = h * 3 + 1;
@@ -33,7 +33,7 @@ public class shellsort {
                     data[j + h] = tmp;
                 }
             }
-            // ¼ÆËã³öÏÂÒ»¸öhÖµ
+            // è®¡ç®—å‡ºä¸‹ä¸€ä¸ªhå€¼
             h = (h - 1) / 3;
         }
     }
