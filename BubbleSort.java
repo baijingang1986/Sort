@@ -1,4 +1,4 @@
-public class maopaosort {
+public class BubbleSort {
     public static void bubbleSort(int[] a)
     {
         int temp = 0;
