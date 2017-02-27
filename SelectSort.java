@@ -1,4 +1,4 @@
-public class xuanzesort {
+public class SelectSort {
     public static void selectSort(int[] a) {
         int index, temp;
         for (int i = a.length - 1; i >= 0; i--) {
@@ -21,10 +21,10 @@ public class xuanzesort {
             return;
         for(int i = 0; i < a.length-1; i++)
         {
-            minIndex = i;//ÎÞÐòÇøµÄ×îÐ¡Êý¾ÝÊý×éÏÂ±ê
+            minIndex = i;//æ— åºåŒºçš„æœ€å°æ•°æ®æ•°ç»„ä¸‹æ ‡
             for(int j = i+1; j < a.length; j++)
             {
-                //ÔÚÎÞÐòÇøÖÐÕÒµ½×îÐ¡Êý¾Ý²¢±£´æÆäÊý×éÏÂ±ê
+                //åœ¨æ— åºåŒºä¸­æ‰¾åˆ°æœ€å°æ•°æ®å¹¶ä¿å­˜å…¶æ•°ç»„ä¸‹æ ‡
                 if(a[j] < a[minIndex])
                 {
                     minIndex = j;
@@ -32,7 +32,7 @@ public class xuanzesort {
             }
             if(minIndex != i)
             {
-                //Èç¹û²»ÊÇÎÞÐòÇøµÄ×îÐ¡ÖµÎ»ÖÃ²»ÊÇÄ¬ÈÏµÄµÚÒ»¸öÊý¾Ý£¬Ôò½»»»Ö®¡£
+                //å¦‚æžœä¸æ˜¯æ— åºåŒºçš„æœ€å°å€¼ä½ç½®ä¸æ˜¯é»˜è®¤çš„ç¬¬ä¸€ä¸ªæ•°æ®ï¼Œåˆ™äº¤æ¢ä¹‹ã€‚
                 temp = a[i];
                 a[i] = a[minIndex];
                 a[minIndex] = temp;
