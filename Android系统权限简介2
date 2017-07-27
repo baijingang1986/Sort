@@ -1,0 +1,66 @@
+
+##定义和实施权限
+要实施您自己的权限，必须先使用一个或多个< permission>元素在 AndroidManifest.xml 中声明它们。
+
+例如，想要控制谁可以开始其中一个 Activity 的应用,可如下所示声明此操作的权限：
+```android
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.example.myapp" >
+    <permission android:name="com.example.myapp.permission.DEADLY_ACTIVITY"
+        android:label="@string/permlab_deadlyActivity"
+        android:description="@string/permdesc_deadlyActivity"
+        android:permissionGroup="android.permission-group.COST_MONEY"
+        android:protectionLevel="dangerous" />
+    ...
+</manifest>
+```
+注：系统不允许多个软件包使用同一名称声明权限，除非所有软件包都使用同一证书签署。如果软件包声明权限，则系统不允许用户安装具有相同权限名称的其他软件包，除非这些软件包使用与第一个软件包相同的证书签署。为避免命名冲突，建议对自定义权限使用相反域名样式命名，例如 com.example.myapp.ENGAGE_HYPERSPACE。
+
+**protectionLevel** 属性是必要属性，用于指示系统如何向用户告知需要权限的应用，或者谁可以拥有该权限
+
+**android:permissionGroup** 属性是可选属性，只是用于帮助系统向用户显示权限。大多数情况下，您要将此设为标准系统组（列在 android.Manifest.permission_group 中），但您也可以自己定义一个组。建议使用现有的组，因为这样可简化向用户显示的权限 UI。
+
+需要为权限提供标签和描述。这些是用户在查看权限列表（**android:label**）或单一权限详细信息（**android:description**）时可以看到的字符串资源。标签应简短；用几个词描述权限保护的功能的关键部分。描述应该用几个句子描述权限允许持有人执行的操作。我们的约定是用两个句子描述：第一句描述权限，第二句向用户提醒为应用授予权限后可能出现的错误类型。
+
+下面是 CALL_PHONE 权限的标签和描述示例：
+```android
+<string name="permlab_callPhone">directly call phone numbers</string>
+<string name="permdesc_callPhone">Allows the application to call
+    phone numbers without your intervention. Malicious applications may
+    cause unexpected calls on your phone bill. Note that this does not
+    allow the application to call emergency numbers.</string>
+```
+可以使用 Settings 应用和 shell 命令 adb shell pm list permissions 查看系统中当前定义的权限。要使用 Settings 应用，请转到 Settings > Applications。选择一个应用并向下滚动查看该应用使用的权限。对于开发者，adb '-s' 选项以类似于用户将会看到的形式显示权限：
+```android
+$ adb shell pm list permissions -s
+All Permissions:
+
+Network communication: view Wi-Fi state, create Bluetooth connections, full
+Internet access, view network state
+
+Your location: access extra location provider commands, fine (GPS) location,
+mock location sources for testing, coarse (network-based) location
+
+Services that cost you money: send SMS messages, directly call phone numbers
+...
+```
+###实施 AndroidManifest.xml 中的权限
+
+通过定义 < uses-permission>元素请求使用其他应用的自定义权限。
+
+可以通过 AndroidManifest.xml 应用高级权限，限制访问系统或应用的全部组件。要执行此操作，在所需的组件上包含 android:permission 属性，用于声明控制访问它的权限：
+
+Activity 权限（应用于 < activity> 标记）限制谁可以启动此 Activity。在调用Context.startActivity() 和 Activity.startActivityForResult() 时会检查此权限；如果调用方没有所需的权限，则调用会抛出 SecurityException。
+
+Service 权限（应用于 < service> 标记）限制谁可以启动或绑定到此服务。在调用Context.startService()、Context.stopService() 和 Context.bindService() 时会检查权限；如果调用方没有所需的权限，则调用会抛出 SecurityException。
+
+BroadcastReceiver 权限（应用于 < receiver> 标记）限制谁可以发送广播给此接收方。在 Context.sendBroadcast() 返回后检查权限，因为系统会尝试将提交的广播传递到指定的接收方。因此，权限失效不会导致向调用方抛回异常；只是不会传递该 intent。同样，可以向 Context.registerReceiver() 提供权限来控制谁可以广播到以编程方式注册的接收方。另一方面，可以在调用 Context.sendBroadcast() 时提供权限来限制允许哪些 BroadcastReceiver 对象接收广播。
+
+ContentProvider 权限（应用于 < provider> 标记）限制谁可以访问 ContentProvider 中的数据。与其他组件不同，可以设置两个单独的权限属性：android:readPermission 限制谁可以读取提供程序，android:writePermission 限制谁可以写入提供程序。
+
+请注意，如果提供程序有读取和写入权限保护，仅拥有写入权限并不表示您可以读取提供程序。第一次检索提供程序时将会检查权限（如果没有任何权限，将会抛出 SecurityException），对提供程序执行操作时也会检查权限。使用 ContentResolver.query() 需要拥有读取权限；使用 ContentResolver.insert()、ContentResolver.update()、ContentResolver.delete() 需要写入权限。在所有这些情况下，没有所需的权限将导致调用抛出 SecurityException。
+
+###发送广播时实施权限
+除了实施谁可以向注册的 BroadcastReceiver 发送 intent 的权限（如上所述），还可以指定在发送广播时需要的权限。通过调用带有权限参数的 Context.sendBroadcast()，您可以要求接收方的应用必须拥有该权限才可接收您的广播。
+
+请注意，接收者和广播者可能需要权限。此时，这两项权限检查都必须通过后方可将 intent 传递到相关的目标。
