@@ -1,0 +1,218 @@
+
+
+import android.annotation.TargetApi;
+import android.app.Activity;
+import android.os.AsyncTask;
+import android.os.Environment;
+import android.os.SystemClock;
+import android.os.Build.VERSION;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.lang.ref.WeakReference;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.HashMap;
+import java.util.Map;
+
+public class ProgressDownloadUtil {
+    static CommonLog log = CommonLog.getLog("ProgressDownloadUtil");
+    static Map<String, WeakReference<ProgressDownloadUtil.DownloadTask>> taskMap = new HashMap();
+
+    public ProgressDownloadUtil() {
+    }
+
+    @TargetApi(11)
+    public static void download(Activity activity, File file, String url, Callback<Boolean> callback, ProgressDownloadUtil.OnProgressChangeListener onProgressChangeListener) {
+        ProgressDownloadUtil.DownloadTask task;
+        if(taskMap.containsKey(file.getAbsolutePath())) {
+            task = (ProgressDownloadUtil.DownloadTask)((WeakReference)taskMap.remove(file.getAbsolutePath())).get();
+            if(task != null) {
+                task.isCancle = true;
+                task.cancel(true);
+            }
+        }
+
+        task = new ProgressDownloadUtil.DownloadTask(activity, file, url, callback, onProgressChangeListener);
+        if(VERSION.SDK_INT >= 11) {
+            task.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, new String[0]);
+        } else {
+            task.execute(new String[0]);
+        }
+
+        taskMap.put(file.getAbsolutePath(), new WeakReference(task));
+    }
+
+    public static void cancle(File file) {
+        if(taskMap.containsKey(file.getAbsolutePath())) {
+            ProgressDownloadUtil.DownloadTask task = (ProgressDownloadUtil.DownloadTask)((WeakReference)taskMap.remove(file.getAbsolutePath())).get();
+            if(task != null) {
+                task.isCancle = true;
+                task.cancel(true);
+            }
+        }
+
+    }
+
+    private static class DownloadTask extends AsyncTask<String, Integer, Boolean> {
+        private final String url;
+        private int length;
+        private File file;
+        private Callback<Boolean> callback;
+        private DialogUtil dialogUtil = new DialogUtil();
+        private WeakReference<Activity> activity;
+        private ProgressDownloadUtil.OnProgressChangeListener mOnProgressChangeListener;
+        boolean isCancle = false;
+
+        public DownloadTask(Activity activity, File file, String url, Callback<Boolean> callback, ProgressDownloadUtil.OnProgressChangeListener onProgressChangeListener) {
+            this.activity = new WeakReference(activity);
+            this.file = file;
+            this.url = url;
+            this.callback = callback;
+            this.mOnProgressChangeListener = onProgressChangeListener;
+        }
+
+        protected void onCancelled() {
+            super.onCancelled();
+            ProgressDownloadUtil.taskMap.remove(this.file.getAbsolutePath());
+
+            try {
+                if(this.callback != null) {
+                    this.callback.callback(Boolean.valueOf(false));
+                    ProgressDownloadUtil.log.e("onCancelled");
+                    ProgressDownloadUtil.log.e("onCancelled : isCancle" + this.isCancle);
+                }
+            } catch (Exception var2) {
+                ProgressDownloadUtil.log.e(var2 + "");
+            }
+
+        }
+
+        protected void onPostExecute(Boolean result) {
+            ProgressDownloadUtil.taskMap.remove(this.file.getAbsolutePath());
+            ProgressDownloadUtil.log.e("onPostExecute isCancle : " + this.isCancle);
+            if(!this.isCancelled()) {
+                try {
+                    if(this.callback != null) {
+                        this.callback.callback(result);
+                        ProgressDownloadUtil.log.e("onPostExecute : " + result);
+                    }
+                } catch (Exception var3) {
+                    ;
+                }
+            }
+
+        }
+
+        protected void onProgressUpdate(Integer... values) {
+            int max = values[0].intValue();
+            int current = values[1].intValue();
+
+            try {
+                if(max > 0) {
+                    this.mOnProgressChangeListener.OnProgressChange(current * 100 / max);
+                    ProgressDownloadUtil.log.e("onProgressUpdate : " + current + "/" + max + ", " + current * 100 / max);
+                    ProgressDownloadUtil.log.e("onProgressUpdate isCancle : " + this.isCancle);
+                }
+            } catch (Exception var5) {
+                ;
+            }
+
+        }
+
+        protected Boolean doInBackground(String... params) {
+            InputStream is = null;
+            FileOutputStream os = null;
+
+            Boolean var7;
+            try {
+                this.publishProgress(new Integer[]{Integer.valueOf(-1), Integer.valueOf(-1)});
+                URL url = new URL(this.url);
+                HttpURLConnection connection = (HttpURLConnection)url.openConnection();
+                connection.setConnectTimeout(30000);
+                connection.setReadTimeout(30000);
+                connection.setUseCaches(false);
+                NetConfig.processRawHttpConnection(connection);
+                connection.setInstanceFollowRedirects(true);
+                is = connection.getInputStream();
+                if(!this.file.exists()) {
+                    this.file.createNewFile();
+                }
+
+                os = new FileOutputStream(this.file);
+                int totalRead = 0;
+                this.length = connection.getContentLength();
+                if(!this.isCancle) {
+                    if(FileUtils.getFreeSpace(Environment.getExternalStorageDirectory()) < (long)this.length) {
+                        StatisticsBase.onNlogStatEvent("VIDEO_ERROR_NOT_ENOUGH_SPACE");
+                        this.dialogUtil.dismissViewDialog();
+                        DialogUtil var10000 = this.dialogUtil;
+                        DialogUtil.showToast(InitApplication.getApplication(), "SD卡空间不足", false);
+                        var7 = Boolean.valueOf(false);
+                        return var7;
+                    }
+
+                    byte[] data = new byte[1024];
+                    long beginLoadTime = SystemClock.elapsedRealtime();
+                    long lastTime = SystemClock.elapsedRealtime();
+
+                    int read;
+                    long currentTime;
+                    while(!this.isCancelled() && (read = is.read(data)) != -1) {
+                        if(this.isCancle) {
+                            ProgressDownloadUtil.log.e("doInBackground isCancle2 : " + this.isCancle);
+                            Boolean var33 = Boolean.valueOf(false);
+                            return var33;
+                        }
+
+                        os.write(data, 0, read);
+                        totalRead += read;
+                        currentTime = SystemClock.elapsedRealtime();
+                        if(currentTime - lastTime > 100L) {
+                            this.publishProgress(new Integer[]{Integer.valueOf(this.length), Integer.valueOf(totalRead)});
+                            lastTime = currentTime;
+                        }
+                    }
+
+                    connection.disconnect();
+                    ProgressDownloadUtil.log.e("doInBackground isCancle3 : " + this.isCancle);
+                    currentTime = SystemClock.elapsedRealtime();
+                    long loadTime = (currentTime - beginLoadTime) / 1000L;
+                    Activity mActivity = (Activity)this.activity.get();
+                    if(mActivity != null) {
+                        StatisticsBase.onNlogStatEvent("VIDEO_PLUGIN_DOWNLOAD_TIME", Long.toString(loadTime) == null?"null":Long.toString(loadTime));
+                    }
+
+                    return Boolean.valueOf(true);
+                }
+
+                ProgressDownloadUtil.log.e("doInBackground isCancle1 : " + this.isCancle);
+                var7 = Boolean.valueOf(false);
+            } catch (Exception var29) {
+                var29.printStackTrace();
+                Boolean var5 = Boolean.valueOf(false);
+                return var5;
+            } finally {
+                try {
+                    if(is != null) {
+                        is.close();
+                    }
+
+                    if(os != null) {
+                        os.close();
+                    }
+                } catch (Exception var28) {
+                    var28.printStackTrace();
+                }
+
+            }
+
+            return var7;
+        }
+    }
+
+    public interface OnProgressChangeListener {
+        void OnProgressChange(int var1);
+    }
+}
