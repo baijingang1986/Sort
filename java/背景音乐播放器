@@ -1,0 +1,218 @@
+
+
+
+import android.content.Context;
+import android.content.res.AssetFileDescriptor;
+import android.media.AudioManager;
+import android.media.MediaPlayer;
+
+import java.io.IOException;
+
+import static android.media.AudioManager.AUDIOFOCUS_GAIN;
+import static android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT;
+import static android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE;
+import static android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK;
+import static android.media.AudioManager.AUDIOFOCUS_LOSS;
+import static android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT;
+import static android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK;
+
+
+public class BackgroundSoundPlayer {
+    public final static float VOLUME_DEFAULT = 1;
+    public final static float VOLUME_LOWER = 0.2F;
+    private static BackgroundSoundPlayer mInstance;
+    MediaPlayer mPlayer;
+    boolean isLooping = true;
+    private float mVolume = VOLUME_DEFAULT;
+    private AudioManager mAudioManager;
+    private int currentSound;
+    private BackgroundSoundPlayer() {
+
+    }
+
+    public static BackgroundSoundPlayer getInstance() {
+        if (mInstance == null) {
+            mInstance = new BackgroundSoundPlayer();
+        }
+        return mInstance;
+    }
+
+    private void initPlayer() {
+        try {
+            if (mPlayer == null) {
+                mPlayer = MediaPlayer.create(BaseApplication.getApplication(), currentSound);
+            }
+        } catch (Exception e) {
+            //Caused by: java.lang.NullPointerException  mPlayer is null
+        }
+    }
+
+    public void playRawSound(int soundRawId) {
+        if (currentSound != soundRawId) {
+            currentSound = soundRawId;
+            initPlayer();
+            try {
+                mPlayer.reset();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            mPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
+            mPlayer.setScreenOnWhilePlaying(false);
+            mPlayer.setOnPreparedListener(mOnPreparedListener);
+            mPlayer.setOnCompletionListener(mOnCompletionListener);
+            setLooping(isLooping);
+            setVolume(VOLUME_DEFAULT);
+            AssetFileDescriptor afd = BaseApplication.getApplication().getResources().openRawResourceFd(currentSound);
+            try {
+                mPlayer.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
+                mPlayer.prepare();
+            } catch (IOException e) {
+                e.printStackTrace();
+            } finally {
+                try {
+                    afd.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+            try {
+                play();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private void play() {
+        pauseOtherAudio();
+        if (mPlayer == null) {
+            initPlayer();
+        }
+        if (!mPlayer.isPlaying()) {
+            mPlayer.start();
+        }
+    }
+
+    public void pause() {
+        try {
+            if (mPlayer != null && mPlayer.isPlaying()) {
+                mPlayer.pause();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void stop() {
+        try {
+            if (mPlayer != null && mPlayer.isPlaying()) {
+                mPlayer.stop();
+            }
+            currentSound = -1;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void release() {
+        if (mPlayer != null) {
+            stop();
+            mPlayer.release();
+            mPlayer = null;
+            resumeOtherAudio();
+        }
+        mInstance = null;
+    }
+
+    /**
+     * 设置音量
+     *
+     * @param volume range 0.0 to 1.0
+     */
+    public void setVolume(float volume) {
+        if (mPlayer != null) {
+            try {
+                mVolume = volume;
+                mPlayer.setVolume(volume, volume);
+            } catch (Exception e) {
+            }
+        }
+    }
+
+    public float getVolume() {
+        return mVolume;
+    }
+
+    public boolean isLooping() {
+        return isLooping;
+    }
+
+    public void setLooping(boolean looping) {
+        isLooping = looping;
+        if (mPlayer != null) {
+            mPlayer.setLooping(isLooping);
+        }
+    }
+
+    /**
+     * 暂停其他音乐播放
+     */
+    private void pauseOtherAudio() {
+        if (mAudioManager == null) {
+            mAudioManager = (AudioManager) BaseApplication.getApplication().getSystemService(Context.AUDIO_SERVICE);
+        }
+        if (mAudioManager != null) {
+            mAudioManager.requestAudioFocus(mAudioFocusChangeListener, AudioManager.STREAM_MUSIC, AUDIOFOCUS_GAIN);
+        }
+    }
+
+    /**
+     * 释放焦点，通知其他音乐播放
+     */
+    private void resumeOtherAudio() {
+        if (mAudioManager != null) {
+            mAudioManager.abandonAudioFocus(mAudioFocusChangeListener);
+            mAudioManager = null;
+        }
+    }
+
+    private AudioManager.OnAudioFocusChangeListener mAudioFocusChangeListener = new AudioManager.OnAudioFocusChangeListener() {
+        @Override
+        public void onAudioFocusChange(int focusChange) {
+            switch (focusChange) {
+                case AUDIOFOCUS_GAIN:
+                case AUDIOFOCUS_GAIN_TRANSIENT:
+                case AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK:
+                case AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE:
+                    if (PreferenceUtils.getBoolean(CartoonPreference.GAME_SOUND_STATUS)) {
+                        getInstance().play();
+                    }
+                    break;
+                case AUDIOFOCUS_LOSS:
+                case AUDIOFOCUS_LOSS_TRANSIENT:
+                case AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
+                    getInstance().pause();
+                    break;
+                default:
+
+            }
+        }
+    };
+
+    private MediaPlayer.OnPreparedListener mOnPreparedListener = new MediaPlayer.OnPreparedListener() {
+        @Override
+        public void onPrepared(MediaPlayer mp) {
+            mp.start();
+        }
+    };
+
+    private MediaPlayer.OnCompletionListener mOnCompletionListener = new MediaPlayer.OnCompletionListener() {
+        @Override
+        public void onCompletion(MediaPlayer mp) {
+//            if (isLooping) {
+//                mp.seekTo(0);
+//                mp.start();
+//            }
+        }
+    };
+}
