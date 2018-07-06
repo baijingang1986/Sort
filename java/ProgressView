@@ -1,0 +1,77 @@
+
+import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.RectF;
+import android.util.AttributeSet;
+import android.view.View;
+
+public class ProgressView extends View {
+    private static final int BG_COLOR = 0xfff1f1f9;
+    private static final int FG_COLOR_LESS_THAN_90 = 0xff9292B0;
+    private static final int FG_COLOR_MORE_THAN_90 = 0xffff6535;
+    private static final float STROKE_WIDTH = 7f;
+
+    private Context mContext;
+    private Paint mProgressPaint;
+    private float mProgress = 0;
+    private int mStrokeWidth;
+    private RectF backContent = new RectF();
+    private RectF frontContent = new RectF();
+
+    public ProgressView(Context context) {
+        super(context);
+        this.mContext = context;
+        init();
+    }
+
+    public ProgressView(Context context, AttributeSet attrs) {
+        super(context, attrs);
+        this.mContext = context;
+        init();
+    }
+
+    private void init() {
+        //初始化进度条paint
+        mStrokeWidth = ScreenUtil.dp2px(mContext, STROKE_WIDTH);
+        mProgressPaint = new Paint();
+        mProgressPaint.setAntiAlias(true);
+        mProgressPaint.setStrokeWidth(mStrokeWidth);
+        mProgressPaint.setStyle(Paint.Style.FILL);
+        mProgressPaint.setStrokeCap(Paint.Cap.SQUARE);
+    }
+
+    /**
+     *
+     * @param progress 0 ~ 1
+     */
+    public void setProgress(float progress) {
+        mProgress = progress;
+        invalidate();
+    }
+
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+        //总空间进度条
+        backContent.left = 0;
+        backContent.top = 0;
+        backContent.right = getMeasuredWidth();
+        backContent.bottom = getMeasuredHeight();
+        //已用空间进度条
+        frontContent.left = 0;
+        frontContent.top = 0;
+        frontContent.right = getMeasuredWidth() * mProgress;
+        frontContent.bottom = getMeasuredHeight();
+    }
+
+    @Override
+    protected void onDraw(Canvas canvas) {
+        super.onDraw(canvas);
+        //绘制进度条
+        mProgressPaint.setColor(BG_COLOR);
+        canvas.drawRoundRect(backContent,10, 10, mProgressPaint);
+        mProgressPaint.setColor(mProgress < 0.9f ? FG_COLOR_LESS_THAN_90 : FG_COLOR_MORE_THAN_90);
+        canvas.drawRoundRect(frontContent, 10, 10, mProgressPaint);
+    }
+}
