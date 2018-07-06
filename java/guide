@@ -1,0 +1,569 @@
+
+import android.app.Activity;
+import android.app.Dialog;
+import android.content.DialogInterface;
+import android.graphics.RectF;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
+import android.view.Window;
+import android.view.WindowManager;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+
+
+public class GuideController {
+
+    public static final int GUIDE_THEME = 1;
+
+
+    private static final int GUIDE_SCENE = 1 << 1;
+
+
+    private static final int GUIDE_STORE = 1 << 2;
+
+
+    private static final int GUIDE_COVER = 1 << 3;
+
+
+    private static final int GUIDE_CARD = 1 << 4;
+
+
+    private static final int GUIDE_PLAY = 1 << 5;
+
+
+    private static final int GUIDE_SWIPE = 1 << 6;
+
+
+    public static final int GUIDE_SIGNIN = 1 << 7;
+
+
+    public static final int GUIDE_THEME_TAB = 1 << 8;
+
+
+    public static final int GUIDE_ME_TAB = 1 << 9;
+
+    public static final boolean SHOW_GUIDE = true;
+
+
+    public static void checkSignInGuide(final Activity activity) {
+        if (SHOW_GUIDE && !guideShowed(GUIDE_SIGNIN)) {
+            final FrameLayout signIn = activity.findViewById(R.id.ct_signin_container);
+            if (signIn == null) return;
+            signIn.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+                @Override
+                public boolean onPreDraw() {
+                    if (!activity.isFinishing()) {
+                        signIn.getViewTreeObserver().removeOnPreDrawListener(this);
+                        final BookGuideView guideView = new BookGuideView(activity);
+                        guideView.setRoundRadius(100);
+                        final int padding = ScreenUtil.dp2px(10);
+                        guideView.setHolePadding(padding, padding, padding, padding);
+                        guideView.setHoleArea(signIn, activity.findViewById(android.R.id.content), new BookGuideView.OnHoleAreaCalculatedListener() {
+                            @Override
+                            public void onHoleAreaCalculated() {
+                                final RectF rect = guideView.getHoleArea();
+                                final ImageView img = new ImageView(activity);
+                                img.setScaleType(ImageView.ScaleType.FIT_XY);
+                                final FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+                                params.gravity = Gravity.RIGHT;
+                                params.topMargin = (int) (guideView.getY() + rect.top + ScreenUtil.dp2px(14));
+                                img.setLayoutParams(params);
+                                img.setImageResource(R.drawable.book_guide_signin);
+                                guideView.addView(img);
+                            }
+                        });
+                        final Dialog dialog = showGuide(activity, guideView);
+                        dialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
+                            @Override
+                            public void onDismiss(DialogInterface dialog) {
+                                storeGuideStep(GUIDE_SIGNIN);
+                                checkThemeTabGuide(activity);
+                            }
+                        });
+                        guideView.setOnClickListener(new View.OnClickListener() {
+                            @Override
+                            public void onClick(View v) {
+          
+                                dialog.dismiss();
+                            }
+                        });
+                    }
+                    return true;
+                }
+            });
+            StatisticsBase.onNlogStatEvent(StatConstants.PB_BOOK_FRESH_USER_GUIDE_CLICK, "source", "signin");
+        } else {
+            checkThemeTabGuide(activity);
+        }
+    }
+
+    /**
+     * 主题TAB引导
+     * @param activity
+     */
+    private static void checkThemeTabGuide(final Activity activity) {
+        if (SHOW_GUIDE && !guideShowed(GUIDE_THEME_TAB)) {
+            final View themeTab = activity.findViewById(R.id.tab_theme_guide);
+            if (themeTab == null) return;
+            themeTab.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+                @Override
+                public boolean onPreDraw() {
+                    if (!activity.isFinishing()) {
+                        themeTab.getViewTreeObserver().removeOnPreDrawListener(this);
+                        final BookGuideView guideView = new BookGuideView(activity);
+                        guideView.setRoundRadius(100);
+                        final int padding = ScreenUtil.dp2px(28);
+                        guideView.setHolePadding(padding, padding-6, padding, padding+6);
+                        guideView.setHoleArea(themeTab, activity.findViewById(android.R.id.content), new BookGuideView.OnHoleAreaCalculatedListener() {
+                            @Override
+                            public void onHoleAreaCalculated() {
+                                final RectF rect = guideView.getHoleArea();
+                                final ImageView img = new ImageView(activity);
+                                img.setScaleType(ImageView.ScaleType.FIT_XY);
+                                final FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+                                params.gravity = Gravity.LEFT | Gravity.BOTTOM;
+                                img.setLayoutParams(params);
+                                img.setImageResource(R.drawable.book_guide_theme_tab);
+                                guideView.addView(img);
+                            }
+                        });
+                        final Dialog dialog = showGuide(activity, guideView);
+                        dialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
+                            @Override
+                            public void onDismiss(DialogInterface dialog) {
+                                storeGuideStep(GUIDE_THEME_TAB);
+                                checkMeTabGuide(activity);
+                            }
+                        });
+                        guideView.setOnClickListener(new View.OnClickListener() {
+                            @Override
+                            public void onClick(View v) {
+                                GameSoundPoolManager.getInstance().play(GameSoundPoolManager.SoundType.MP3_2);
+                                dialog.dismiss();
+                            }
+                        });
+                    }
+                    return true;
+                }
+            });
+            StatisticsBase.onNlogStatEvent(StatConstants.PB_BOOK_FRESH_USER_GUIDE_CLICK, "source", "themetab");
+        } else {
+            checkMeTabGuide(activity);
+        }
+    }
+
+    /**
+ 
+     * @param activity
+     */
+    private static void checkMeTabGuide(final Activity activity) {
+        if (SHOW_GUIDE && !guideShowed(GUIDE_ME_TAB)) {
+            final View meTab = activity.findViewById(R.id.tab_me_guide);
+            if (meTab == null) return;
+            meTab.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+                @Override
+                public boolean onPreDraw() {
+                    if (!activity.isFinishing()) {
+                        meTab.getViewTreeObserver().removeOnPreDrawListener(this);
+                        final BookGuideView guideView = new BookGuideView(activity);
+                        guideView.setRoundRadius(100);
+                        final int padding = ScreenUtil.dp2px(28);
+                        guideView.setHolePadding(padding, padding-6, padding, padding+6);
+                        guideView.setHoleArea(meTab, activity.findViewById(android.R.id.content), new BookGuideView.OnHoleAreaCalculatedListener() {
+                            @Override
+                            public void onHoleAreaCalculated() {
+                                final RectF rect = guideView.getHoleArea();
+                                final ImageView img = new ImageView(activity);
+                                img.setScaleType(ImageView.ScaleType.FIT_XY);
+                                final FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+                                params.gravity = Gravity.LEFT | Gravity.BOTTOM;
+                                img.setLayoutParams(params);
+                                img.setImageResource(R.drawable.book_guide_me_tab);
+                                guideView.addView(img);
+                            }
+                        });
+                        final Dialog dialog = showGuide(activity, guideView);
+                        dialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
+                            @Override
+                            public void onDismiss(DialogInterface dialog) {
+                                storeGuideStep(GUIDE_ME_TAB);
+                            }
+                        });
+                        guideView.setOnClickListener(new View.OnClickListener() {
+                            @Override
+                            public void onClick(View v) {
+                                GameSoundPoolManager.getInstance().play(GameSoundPoolManager.SoundType.MP3_2);
+                                dialog.dismiss();
+                            }
+                        });
+                    }
+                    return true;
+                }
+            });
+            StatisticsBase.onNlogStatEvent(StatConstants.PB_BOOK_FRESH_USER_GUIDE_CLICK, "source", "metab");
+        }
+    }
+
+    /**
+
+     * @param activity
+     */
+    public static void checkBookStoreGuide(final Activity activity) {
+        if (SHOW_GUIDE && !guideShowed(GUIDE_STORE)) {
+            final RecyclerPullView bookList = activity.findViewById(R.id.abs_book_list);
+            if (bookList == null) return;
+            bookList.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+                @Override
+                public boolean onPreDraw() {
+                    if (!activity.isFinishing()) {
+                        bookList.getViewTreeObserver().removeOnPreDrawListener(this);
+                        final BookGuideView guideView = new BookGuideView(activity);
+                        final int padding = ScreenUtil.dp2px(5);
+                        View headView = activity.findViewById(R.id.bst_root);
+                        int paddingTop = -padding;
+                        if (headView != null) {
+                            paddingTop = -headView.getMeasuredHeight();
+                        }
+                        guideView.setHolePadding(-padding, paddingTop, -padding, padding);
+                        guideView.setVisibility(View.INVISIBLE);
+                        guideView.setHoleArea(bookList, activity.findViewById(android.R.id.content), new BookGuideView.OnHoleAreaCalculatedListener() {
+                            @Override
+                            public void onHoleAreaCalculated() {
+                                final RectF rect = guideView.getHoleArea();
+                                final ImageView img = new ImageView(activity);
+                                img.setScaleType(ImageView.ScaleType.FIT_XY);
+                                final FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+                                params.gravity = Gravity.CENTER_HORIZONTAL;
+                                params.topMargin = (int) (guideView.getY() + rect.top + ScreenUtil.dp2px(4));
+                                img.setLayoutParams(params);
+                                img.setImageResource(R.drawable.book_guide_store_book);
+                                guideView.addView(img);
+                                guideView.post(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        params.topMargin -= img.getMeasuredHeight();
+                                        img.setLayoutParams(params);
+                                        guideView.setVisibility(View.VISIBLE);
+                                    }
+                                });
+                            }
+                        });
+                        final Dialog dialog = showGuide(activity, guideView);
+                        dialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
+                            @Override
+                            public void onDismiss(DialogInterface dialog) {
+                                storeGuideStep(GUIDE_STORE);
+                                checkBookSceneGuide(activity);
+                            }
+                        });
+                        guideView.setOnClickListener(new View.OnClickListener() {
+                            @Override
+                            public void onClick(View v) {
+                                GameSoundPoolManager.getInstance().play(GameSoundPoolManager.SoundType.MP3_2);
+                                dialog.dismiss();
+                            }
+                        });
+                    }
+                    return true;
+                }
+            });
+            StatisticsBase.onNlogStatEvent(StatConstants.PB_BOOK_FRESH_USER_GUIDE_CLICK, "source", "rack");
+        }
+    }
+
+    /**
+
+     * @param activity
+     */
+    public static void checkBookSceneGuide(final Activity activity) {
+        if (SHOW_GUIDE) {
+            if (!guideShowed(GUIDE_SCENE) && guideShowed(GUIDE_STORE) && PreferenceUtils.getBoolean(CartoonPreference.BOOK_COVER_REACHED)) {
+                final ImageView sceneIcon = activity.findViewById(R.id.abs_scene_icon);
+                if (sceneIcon == null) return;
+                    sceneIcon.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+                    @Override
+                    public boolean onPreDraw() {
+                        if (!activity.isFinishing()) {
+                            sceneIcon.getViewTreeObserver().removeOnPreDrawListener(this);
+                            final BookGuideView guideView = new BookGuideView(activity);
+                            final int padding = ScreenUtil.dp2px(5);
+                            guideView.setHolePadding(padding, padding, padding, padding);
+                            guideView.setHoleArea(sceneIcon, activity.findViewById(android.R.id.content), new BookGuideView.OnHoleAreaCalculatedListener() {
+                                @Override
+                                public void onHoleAreaCalculated() {
+                                    ImageView img = new ImageView(activity);
+                                    img.setScaleType(ImageView.ScaleType.FIT_XY);
+                                    FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                                    params.gravity = Gravity.BOTTOM;
+                                    params.leftMargin = 50;
+                                    img.setLayoutParams(params);
+                                    img.setImageResource(R.drawable.book_guide_store_scene);
+                                    guideView.addView(img);
+                                }
+                            });
+                            storeGuideStep(GUIDE_SCENE);
+                            final Dialog dialog = showGuide(activity, guideView);
+                            guideView.setOnClickListener(new View.OnClickListener() {
+                                @Override
+                                public void onClick(View v) {
+                                    GameSoundPoolManager.getInstance().play(GameSoundPoolManager.SoundType.MP3_2);
+                                    dialog.dismiss();
+                                }
+                            });
+                        }
+                        return true;
+                    }
+                });
+                StatisticsBase.onNlogStatEvent(StatConstants.PB_BOOK_FRESH_USER_GUIDE_CLICK, "source", "scene");
+            }
+        }
+    }
+
+    /**
+
+     * @param activity
+     */
+    public static void checkBookCoverGuide(final Activity activity) {
+        if (SHOW_GUIDE && !guideShowed(GUIDE_COVER)) {
+            View coverView = activity.findViewById(R.id.abc_book_cover_container);
+            if (coverView != null && !activity.isFinishing()) {
+                final BookGuideView guideView = new BookGuideView(activity);
+                final int padding = ScreenUtil.dp2px(20);
+                guideView.setHolePadding(padding, padding, padding, padding);
+                final View content = activity.findViewById(android.R.id.content);
+                guideView.setHoleArea(coverView, content, new BookGuideView.OnHoleAreaCalculatedListener() {
+                    @Override
+                    public void onHoleAreaCalculated() {
+                        final RectF rect = guideView.getHoleArea();
+                        ImageView img = new ImageView(activity);
+                        img.setScaleType(ImageView.ScaleType.FIT_XY);
+                        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                        params.gravity = Gravity.CENTER_HORIZONTAL|Gravity.BOTTOM;
+                        img.setLayoutParams(params);
+                        img.setImageResource(R.drawable.book_guide_cover);
+                        img.setAdjustViewBounds(true);
+                        img.setMaxHeight((int)(content.getMeasuredHeight() - rect.bottom - ScreenUtil.dp2px(6)));
+                        guideView.addView(img);
+                    }
+                });
+                storeGuideStep(GUIDE_COVER);
+                final Dialog dialog = showGuide(activity, guideView);
+                dialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
+                    @Override
+                    public void onDismiss(DialogInterface dialog) {
+                        checkBookCoverGuide(activity);
+                    }
+                });
+                guideView.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        GameSoundPoolManager.getInstance().play(GameSoundPoolManager.SoundType.MP3_2);
+                        dialog.dismiss();
+                    }
+                });
+                StatisticsBase.onNlogStatEvent(StatConstants.PB_BOOK_FRESH_USER_GUIDE_CLICK, "source", "cover");
+            }
+        }
+    }
+
+    /**
+
+     * @param activity
+     */
+    public static void checkBookCardGuide(final Activity activity) {
+        if (SHOW_GUIDE) {
+            if (!guideShowed(GUIDE_CARD) && !activity.isFinishing()) {
+                View cardView = activity.findViewById(R.id.ct_book_card);
+                if (cardView != null && cardView.getVisibility() == View.VISIBLE) {
+                    final BookGuideView guideView = new BookGuideView(activity);
+                    final int padding = ScreenUtil.dp2px(2);
+                    guideView.setHolePadding(padding, padding, padding, padding);
+                    guideView.setHoleArea(cardView, activity.findViewById(android.R.id.content), new BookGuideView.OnHoleAreaCalculatedListener() {
+                        @Override
+                        public void onHoleAreaCalculated() {
+                            final RectF rect = guideView.getHoleArea();
+                            ImageView img = new ImageView(activity);
+                            img.setScaleType(ImageView.ScaleType.FIT_XY);
+                            FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                            params.topMargin = (int)(guideView.getY() + rect.centerY() / 2);
+                            params.gravity = Gravity.CENTER_HORIZONTAL;
+                            img.setLayoutParams(params);
+                            img.setImageResource(R.drawable.book_guide_card);
+                            guideView.addView(img);
+                        }
+                    });
+                    storeGuideStep(GUIDE_CARD);
+                    final Dialog dialog = showGuide(activity, guideView);
+                    dialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
+                        @Override
+                        public void onDismiss(DialogInterface dialog) {
+                            checkBookCoverGuide(activity);
+                        }
+                    });
+                    guideView.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            GameSoundPoolManager.getInstance().play(GameSoundPoolManager.SoundType.MP3_2);
+                            dialog.dismiss();
+                        }
+                    });
+                    StatisticsBase.onNlogStatEvent(StatConstants.PB_BOOK_FRESH_USER_GUIDE_CLICK, "source", "bookcard");
+                }
+            } else {
+                checkBookCoverGuide(activity);
+            }
+        }
+    }
+
+    /**
+
+     * @param activity
+     */
+    public static void checkShowThemeGuide(Activity activity) {
+        if (SHOW_GUIDE && !guideShowed(GUIDE_THEME)) {
+            FrameLayout rootView = activity.findViewById(android.R.id.content);
+            if (rootView != null) {
+                final View themeGuide = View.inflate(activity, R.layout.book_guide_theme, null);
+                themeGuide.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        GameSoundPoolManager.getInstance().play(GameSoundPoolManager.SoundType.MP3_2);
+                        ViewUtils.removeView(themeGuide);
+                    }
+                });
+                rootView.addView(themeGuide);
+                storeGuideStep(GUIDE_THEME);
+            }
+            StatisticsBase.onNlogStatEvent(StatConstants.PB_BOOK_FRESH_USER_GUIDE_CLICK, "source", "theme");
+        }
+    }
+
+    /**
+
+     *
+     * @param activity
+     * @param callback
+     */
+    public static void checkReadPlayGuide(final Activity activity, final ICallback callback) {
+        if (SHOW_GUIDE && !guideShowed(GUIDE_PLAY) && !activity.isFinishing()) {
+            View playImg = activity.findViewById(R.id.abr_play_pause_img);
+            if (playImg != null) {
+                final BookGuideView guideView = new BookGuideView(activity);
+                guideView.setRoundRadius(1000);
+                final View contentView = activity.findViewById(android.R.id.content);
+                guideView.setHoleArea(playImg, contentView, new BookGuideView.OnHoleAreaCalculatedListener() {
+                    @Override
+                    public void onHoleAreaCalculated() {
+                        final RectF rect = guideView.getHoleArea();
+                        final ImageView img = new ImageView(activity);
+                        final FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                        params.bottomMargin = (int) (contentView.getMeasuredHeight() - rect.top - ScreenUtil.dp2px(5));
+                        params.gravity = Gravity.CENTER_HORIZONTAL|Gravity.BOTTOM;
+                        img.setLayoutParams(params);
+                        img.setImageResource(R.drawable.book_guide_play);
+                        guideView.addView(img);
+                    }
+                });
+                storeGuideStep(GUIDE_PLAY);
+                final Dialog dialog = showGuide(activity, guideView, true);
+                dialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
+                    @Override
+                    public void onDismiss(DialogInterface dialog) {
+                        if (callback != null) {
+                            callback.call();
+                        }
+                    }
+                });
+                guideView.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        GameSoundPoolManager.getInstance().play(GameSoundPoolManager.SoundType.MP3_2);
+                        dialog.dismiss();
+                    }
+                });
+                StatisticsBase.onNlogStatEvent(StatConstants.PB_BOOK_FRESH_USER_GUIDE_CLICK, "source", "pause");
+            }
+        } else {
+            if (callback != null) {
+                callback.call();
+            }
+        }
+    }
+
+    /**
+
+     * @param activity
+     * @param callback
+     */
+    public static void checkReadSwipeGuide(final Activity activity, final ICallback callback) {
+        if (SHOW_GUIDE) {
+            if (!guideShowed(GUIDE_SWIPE) && !activity.isFinishing()) {
+                final BookGuideView guideView = new BookGuideView(activity);
+                final ImageView img = new ImageView(activity);
+                img.setScaleType(ImageView.ScaleType.FIT_XY);
+                final FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                params.gravity = Gravity.CENTER;
+                img.setLayoutParams(params);
+                img.setImageResource(R.drawable.book_guide_swipe);
+                guideView.addView(img);
+                final Dialog dialog = showGuide(activity, guideView, true);
+                dialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
+                    @Override
+                    public void onDismiss(DialogInterface dialog) {
+                        checkReadPlayGuide(activity, callback);
+                    }
+                });
+                guideView.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        GameSoundPoolManager.getInstance().play(GameSoundPoolManager.SoundType.MP3_2);
+                        dialog.dismiss();
+                    }
+                });
+                storeGuideStep(GUIDE_SWIPE);
+                StatisticsBase.onNlogStatEvent(StatConstants.PB_BOOK_FRESH_USER_GUIDE_CLICK, "source", "swipe");
+            } else {
+                checkReadPlayGuide(activity, callback);
+            }
+        } else {
+            if (callback != null) {
+                callback.call();
+            }
+        }
+    }
+
+    public static boolean guideShowed(int step) {
+        int rawStep = PreferenceUtils.getInt(CartoonPreference.GUIDE_STEP);
+        return (rawStep & step) > 0;
+    }
+
+    public static void storeGuideStep(int step) {
+        int rawStep = PreferenceUtils.getInt(CartoonPreference.GUIDE_STEP);
+        rawStep |= step;
+        PreferenceUtils.setInt(CartoonPreference.GUIDE_STEP, rawStep);
+    }
+
+    private static Dialog showGuide(Activity activity, View guideView) {
+        return showGuide(activity, guideView, false);
+    }
+
+    private static Dialog showGuide(Activity activity, View guideView, boolean fullScreen) {
+        Dialog mDialog = new Dialog(activity, R.style.guide_dialog);
+        mDialog.setContentView(guideView);
+        mDialog.setCanceledOnTouchOutside(true);
+        mDialog.setCancelable(true);
+        Window window = mDialog.getWindow();
+        WindowManager.LayoutParams wlp = window.getAttributes();
+        wlp.width = WindowManager.LayoutParams.MATCH_PARENT;
+        wlp.height = WindowManager.LayoutParams.MATCH_PARENT;
+        wlp.windowAnimations = android.R.style.Animation;
+        if (fullScreen) {
+            wlp.flags |= WindowManager.LayoutParams.FLAG_FULLSCREEN;
+        }
+        window.setAttributes(wlp);
+        mDialog.show();
+        return mDialog;
+    }
+}
