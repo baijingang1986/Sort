@@ -1,0 +1,298 @@
+
+
+import android.content.SharedPreferences;
+import android.content.SharedPreferences.Editor;
+import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
+import android.support.v4.util.ArrayMap;
+
+import com.google.jtm.Gson;
+import java.util.LinkedHashSet;
+import java.util.Set;
+
+public class PreferenceUtils {
+    private static ArrayMap<String, SharedPreferences> preferenceCache = new ArrayMap();
+
+    public PreferenceUtils() {
+    }
+
+    public static <T extends Enum<T>> void addPreferenceChangeListener(OnSharedPreferenceChangeListener listener, T... keyIndexes) {
+        Enum[] var2 = keyIndexes;
+        int var3 = keyIndexes.length;
+
+        for(int var4 = 0; var4 < var3; ++var4) {
+            T key = var2[var4];
+            SharedPreferences sharedPreferences = resolvePreference(key);
+            sharedPreferences.registerOnSharedPreferenceChangeListener(listener);
+        }
+
+    }
+
+    public static <T extends Enum<T>> void removePreferenceChangeListener(OnSharedPreferenceChangeListener listener, T... keyIndexes) {
+        Enum[] var2 = keyIndexes;
+        int var3 = keyIndexes.length;
+
+        for(int var4 = 0; var4 < var3; ++var4) {
+            T key = var2[var4];
+            SharedPreferences sharedPreferences = resolvePreference(key);
+            sharedPreferences.unregisterOnSharedPreferenceChangeListener(listener);
+        }
+
+    }
+
+    public static <T extends Enum<T>> String getStorageKey(T keyIndex) {
+        return keyIndex.name();
+    }
+
+    private static <T extends Enum<T>> SharedPreferences resolvePreference(T keyIndex) {
+        String namespace = ((PreferenceUtils.DefaultValueInterface)keyIndex).getNameSpace();
+        SharedPreferences preference = null;
+        Class var3 = PreferenceUtils.class;
+        synchronized(PreferenceUtils.class) {
+            preference = (SharedPreferences)preferenceCache.get(namespace);
+            if(preference == null) {
+                if(preferenceCache.get(namespace) == null) {
+                    preference = InitApplication.getApplication().getSharedPreferences("com.baidu.homework.Preference." + ((PreferenceUtils.DefaultValueInterface)keyIndex).getNameSpace(), 4);
+                    preferenceCache.put(namespace, preference);
+                } else {
+                    preference = (SharedPreferences)preferenceCache.get(namespace);
+                }
+            }
+
+            return preference;
+        }
+    }
+
+    public static <T extends Enum<T>> Long getLong(T keyIndex) {
+        SharedPreferences preferences = resolvePreference(keyIndex);
+        String key = getStorageKey(keyIndex);
+        Long value;
+        if(preferences.contains(key)) {
+            value = Long.valueOf(preferences.getLong(key, 0L));
+        } else {
+            PreferenceUtils.DefaultValueInterface defaultEnum = (PreferenceUtils.DefaultValueInterface)keyIndex;
+            Object defaultValue = defaultEnum.getDefaultValue();
+            if(defaultValue != null) {
+                value = (Long)defaultValue;
+            } else {
+                value = Long.valueOf(0L);
+            }
+        }
+
+        return value;
+    }
+
+    public static synchronized <T extends Enum<T>> void setLong(T keyIndex, long value) {
+        SharedPreferences preferences = resolvePreference(keyIndex);
+        Editor editor = preferences.edit();
+        String key = getStorageKey(keyIndex);
+        editor.putLong(key, value);
+        editor.apply();
+    }
+
+    public static <T extends Enum<T>> int getInt(T keyIndex) {
+        SharedPreferences preferences = resolvePreference(keyIndex);
+        String key = getStorageKey(keyIndex);
+        Integer value;
+        if(preferences.contains(key)) {
+            value = Integer.valueOf(preferences.getInt(key, 0));
+        } else {
+            PreferenceUtils.DefaultValueInterface defaultEnum = (PreferenceUtils.DefaultValueInterface)keyIndex;
+            Object defaultValue = defaultEnum.getDefaultValue();
+            if(defaultValue != null) {
+                value = (Integer)defaultValue;
+            } else {
+                value = Integer.valueOf(0);
+            }
+        }
+
+        return value.intValue();
+    }
+
+    public static synchronized <T extends Enum<T>> void setInt(T keyIndex, int value) {
+        SharedPreferences preferences = resolvePreference(keyIndex);
+        Editor editor = preferences.edit();
+        String key = getStorageKey(keyIndex);
+        editor.putInt(key, value);
+        editor.apply();
+    }
+
+    public static <T extends Enum<T>> String getString(T keyIndex) {
+        SharedPreferences preferences = resolvePreference(keyIndex);
+        String key = getStorageKey(keyIndex);
+        String value;
+        if(preferences.contains(key)) {
+            value = preferences.getString(key, (String)null);
+        } else {
+            PreferenceUtils.DefaultValueInterface defaultEnum = (PreferenceUtils.DefaultValueInterface)keyIndex;
+            Object defaultValue = defaultEnum.getDefaultValue();
+            if(defaultValue != null) {
+                value = (String)defaultValue;
+            } else {
+                value = null;
+            }
+        }
+
+        return value;
+    }
+
+    public static synchronized <T extends Enum<T>> void setString(T keyIndex, String value) {
+        SharedPreferences preferences = resolvePreference(keyIndex);
+        Editor editor = preferences.edit();
+        String key = getStorageKey(keyIndex);
+        editor.putString(key, value);
+        editor.apply();
+    }
+
+    public static <T extends Enum<T>> boolean getBoolean(T keyIndex) {
+        SharedPreferences preferences = resolvePreference(keyIndex);
+        String key = getStorageKey(keyIndex);
+        Boolean value;
+        if(preferences.contains(key)) {
+            value = Boolean.valueOf(preferences.getBoolean(key, false));
+        } else {
+            PreferenceUtils.DefaultValueInterface defaultEnum = (PreferenceUtils.DefaultValueInterface)keyIndex;
+            Object defaultValue = defaultEnum.getDefaultValue();
+            if(defaultValue != null) {
+                value = (Boolean)defaultValue;
+            } else {
+                value = Boolean.valueOf(false);
+            }
+        }
+
+        return value.booleanValue();
+    }
+
+    public static <T extends Enum<T>> void setBoolean(T keyIndex, boolean value) {
+        SharedPreferences preferences = resolvePreference(keyIndex);
+        Editor editor = preferences.edit();
+        String key = getStorageKey(keyIndex);
+        editor.putBoolean(key, value);
+        editor.apply();
+    }
+
+    public static <T extends Enum<T>> float getFloat(T keyIndex) {
+        SharedPreferences preferences = resolvePreference(keyIndex);
+        String key = getStorageKey(keyIndex);
+        Float value;
+        if(preferences.contains(key)) {
+            value = Float.valueOf(preferences.getFloat(key, 0.0F));
+        } else {
+            PreferenceUtils.DefaultValueInterface defaultEnum = (PreferenceUtils.DefaultValueInterface)keyIndex;
+            Object defaultValue = defaultEnum.getDefaultValue();
+            if(defaultValue != null) {
+                value = (Float)defaultValue;
+            } else {
+                value = Float.valueOf(0.0F);
+            }
+        }
+
+        return value.floatValue();
+    }
+
+    public static <T extends Enum<T>> void setFloat(T keyIndex, float value) {
+        SharedPreferences preferences = resolvePreference(keyIndex);
+        Editor editor = preferences.edit();
+        String key = getStorageKey(keyIndex);
+        editor.putFloat(key, value);
+        editor.apply();
+    }
+
+    public static <T extends Enum<T>> Set<String> getStringSet(T keyIndex) {
+        SharedPreferences preferences = resolvePreference(keyIndex);
+        String key = getStorageKey(keyIndex);
+        Object value;
+        if(preferences.contains(key)) {
+            value = preferences.getStringSet(key, (Set)null);
+        } else {
+            PreferenceUtils.DefaultValueInterface defaultEnum = (PreferenceUtils.DefaultValueInterface)keyIndex;
+            Object defaultValue = defaultEnum.getDefaultValue();
+            if(defaultValue != null) {
+                value = (Set)defaultValue;
+            } else {
+                value = new LinkedHashSet();
+            }
+        }
+
+        return (Set)value;
+    }
+
+    public static <T extends Enum<T>> void setStringSet(T keyIndex, Set<String> value) {
+        SharedPreferences preferences = resolvePreference(keyIndex);
+        Editor editor = preferences.edit();
+        String key = getStorageKey(keyIndex);
+        editor.putStringSet(key, value);
+        editor.apply();
+    }
+
+    public static <T extends Enum<T>> void setObject(T keyIndex, Object object) {
+        SharedPreferences preferences = resolvePreference(keyIndex);
+        if(object == null) {
+            removeKey(keyIndex);
+        } else {
+            Gson gson = GsonBuilderFactory.createBuilder();
+            String jsonValue = gson.toJson(object);
+            String key = getStorageKey(keyIndex);
+            Editor editor = preferences.edit();
+            editor.putString(key, jsonValue);
+            editor.apply();
+        }
+
+    }
+
+    public static <E, T extends Enum<T>> E getObject(T keyIndex, Class<E> clazz) {
+        SharedPreferences preferences = resolvePreference(keyIndex);
+        String key = getStorageKey(keyIndex);
+        Object value;
+        if(preferences.contains(key)) {
+            String jsonValue = preferences.getString(key, (String)null);
+            Gson gson = GsonBuilderFactory.createBuilder();
+            value = gson.fromJson(jsonValue, clazz);
+        } else {
+            PreferenceUtils.DefaultValueInterface defaultEnum = (PreferenceUtils.DefaultValueInterface)keyIndex;
+            value = defaultEnum.getDefaultValue();
+        }
+
+        return value;
+    }
+
+    public static <T extends Enum<T>> void removeKey(T keyIndex) {
+        SharedPreferences preferences = resolvePreference(keyIndex);
+        String key = getStorageKey(keyIndex);
+        Editor editor = preferences.edit();
+        editor.remove(key);
+        editor.apply();
+    }
+
+    public static <T extends Enum<T>> boolean hasKey(T keyIndex) {
+        SharedPreferences preferences = resolvePreference(keyIndex);
+        String key = getStorageKey(keyIndex);
+        return preferences.contains(key);
+    }
+
+    public static <T extends Enum<T>> void restoreToDefault(T keyIndex) {
+        PreferenceUtils.DefaultValueInterface defaultEnum = (PreferenceUtils.DefaultValueInterface)keyIndex;
+        Object value = defaultEnum.getDefaultValue();
+        if(value instanceof Boolean) {
+            setBoolean(keyIndex, ((Boolean)value).booleanValue());
+        } else if(value instanceof Integer) {
+            setInt(keyIndex, ((Integer)value).intValue());
+        } else if(value instanceof Long) {
+            setLong(keyIndex, ((Long)value).longValue());
+        } else if(value instanceof String) {
+            setString(keyIndex, (String)value);
+        } else if(value instanceof Float) {
+            setFloat(keyIndex, ((Float)value).floatValue());
+        } else if(value instanceof Set) {
+            setStringSet(keyIndex, (Set)value);
+        } else {
+            setObject(keyIndex, value);
+        }
+
+    }
+
+    public interface DefaultValueInterface {
+        Object getDefaultValue();
+
+        String getNameSpace();
+    }
+}
