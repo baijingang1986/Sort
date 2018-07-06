@@ -1,0 +1,68 @@
+import android.app.Activity;
+import android.app.Application;
+import android.os.Bundle;
+
+public class SoundActivityListener implements Application.ActivityLifecycleCallbacks {
+    @Override
+    public void onActivityCreated(Activity activity, Bundle savedInstanceState) {
+
+    }
+
+    @Override
+    public void onActivityStarted(Activity activity) {
+        if (activity instanceof CartoonBaseActivity) {
+            int soundResource = ((CartoonBaseActivity) activity).getBgSoundResource();
+            if (PreferenceUtils.getBoolean(CartoonPreference.GAME_SOUND_STATUS)) {
+                if (soundResource > 0) {
+                    BackgroundSoundPlayer.getInstance().playRawSound(soundResource);
+                } else {
+                    BackgroundSoundPlayer.getInstance().stop();
+                }
+            }
+        } else if (isCartoonBookWeb(activity)) {
+            BackgroundSoundPlayer.getInstance().playRawSound(R.raw.bgm_1);
+        }
+    }
+
+    @Override
+    public void onActivityResumed(Activity activity) {
+
+    }
+
+    @Override
+    public void onActivityPaused(Activity activity) {
+
+    }
+
+    @Override
+    public void onActivityStopped(Activity activity) {
+        Activity topActivity = BaseApplication.getTopActivity();
+
+        boolean cartoonWebPushed = isCartoonBookWeb(topActivity);
+        boolean activityInBack = (topActivity != null && topActivity == activity); //点击home或者最近任务键
+        boolean notCartoonWebViewAndnotCartoonBaseActivity = (!cartoonWebPushed && (!(topActivity instanceof CartoonBaseActivity)));
+        if (activityInBack || notCartoonWebViewAndnotCartoonBaseActivity) {
+            BackgroundSoundPlayer.getInstance().release();
+        }
+    }
+
+    private boolean isCartoonBookWeb(Activity activity) {
+        if (activity instanceof WebActivity) {
+            String url = ((WebActivity) activity).getWebView().getFirstUrl();
+            if (url != null && url.contains("cartoon_book=1")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public void onActivitySaveInstanceState(Activity activity, Bundle outState) {
+
+    }
+
+    @Override
+    public void onActivityDestroyed(Activity activity) {
+
+    }
+}
