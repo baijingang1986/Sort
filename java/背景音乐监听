@@ -66,3 +66,16 @@ public class SoundActivityListener implements Application.ActivityLifecycleCallb
 
     }
 }
+
+-------------------------------------------------------------------------------------------------------
+
+        if (sSoundActivityListener == null) {
+            sSoundActivityListener = new SoundActivityListener();
+        }
+        getApplication().registerActivityLifecycleCallbacks(sSoundActivityListener);
+        
+        
+                getApplication().unregisterActivityLifecycleCallbacks(sSoundActivityListener);
+        sSoundActivityListener = null;
+        
+        
