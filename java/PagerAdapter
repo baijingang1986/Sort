@@ -1,0 +1,99 @@
+
+public class ThemeAdapter extends PagerAdapter {
+    private List<DrawbookSubjectList.ListItem> mSceneItems;
+    private static Fragment mFragment;
+    private static ICallback mLoadCompleteCallback;
+
+    private static int itemWidth;
+    private static int itemHeight;
+    private TransformViewPager mThemeViewPager;
+
+    public ThemeAdapter(Fragment fragment, TransformViewPager themeViewPager, ArrayList<DrawbookSubjectList.ListItem> itemArrayList, ICallback loadComplete) {
+        this.mSceneItems = itemArrayList;
+        mThemeViewPager = themeViewPager;
+        mFragment = fragment;
+        mLoadCompleteCallback = loadComplete;
+
+        int screenWidth = ScreenUtil.getScreenWidth();
+        int marginWidth = ScreenUtil.dp2px(30);
+        itemWidth = screenWidth - marginWidth * 2;
+        itemHeight = (int)((itemWidth * 809) / 946 + 0.5F);
+    }
+
+    @Override
+    public int getCount() {
+        return mSceneItems == null ? 0 : mSceneItems.size();
+    }
+
+    public DrawbookSubjectList.ListItem getItem(int pos) {
+        return mSceneItems.get(pos);
+    }
+
+    @Override
+    public boolean isViewFromObject(View view, Object object) {
+        return view == object;
+    }
+
+    @Override
+    public Object instantiateItem(ViewGroup container, int position) {
+        View themeView = View.inflate(container.getContext(), R.layout.adapter_theme_item, null);
+        container.addView(themeView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        new ThemeView(themeView).render(mSceneItems.get(position));
+        return themeView;
+    }
+
+    @Override
+    public void finishUpdate(ViewGroup container) {
+        super.finishUpdate(container);
+        mThemeViewPager.notifyTransform();
+    }
+
+    @Override
+    public void destroyItem(ViewGroup container, int position, Object object) {
+        container.removeView((View)object);
+    }
+
+    public static class ThemeView {
+        FrameLayout itemContainer;
+        LottieAnimationView lottieAnimationView;
+        TextView readers;
+
+        public ThemeView(View rootView) {
+            itemContainer = (FrameLayout) rootView.findViewById(R.id.scene_item_container);
+            lottieAnimationView = (LottieAnimationView) rootView.findViewById(R.id.animation_view);
+            ViewGroup.LayoutParams params = lottieAnimationView.getLayoutParams();
+            params.height = itemHeight;
+            params.width = itemWidth;
+            readers = (TextView) rootView.findViewById(R.id.ati_reader);
+        }
+
+        public void render(final DrawbookSubjectList.ListItem item) {
+            String jsonName = "theme/data"+item.subjectId+".json";
+            String imgName = "theme/images"+item.subjectId;
+            lottieAnimationView.setRepeatMode(LottieDrawable.RESTART);
+            lottieAnimationView.setRepeatCount(LottieDrawable.INFINITE);
+            lottieAnimationView.setImageAssetsFolder(imgName);
+            lottieAnimationView.setAnimation(jsonName);
+            lottieAnimationView.playAnimation();
+            readers.setText(item.reader+"人阅读");
+            if (mLoadCompleteCallback != null) {
+                mLoadCompleteCallback.call();
+            }
+            mLoadCompleteCallback = null;
+
+            itemContainer.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    StatConstants.CURRENT_SUBJECT_ID = String.valueOf(item.subjectId);
+                    PreferenceUtils.setString(CartoonPreference.CURRENT_SUBJECT_ID, StatConstants.CURRENT_SUBJECT_ID);
+                    GameSoundPoolManager.getInstance().play(GameSoundPoolManager.SoundType.MP3_1);
+                    if (mFragment.getActivity() != null) {
+                        mFragment.startActivityForResult(BookStoreActivity.createIntent(mFragment.getActivity(), item.subjectId), ThemeListFragment.REQ_BOOK_STORE);
+                        StatConstants.stat(StatConstants.PB_THEME_SELECT_CLICK);
+                    }
+
+                }
+            });
+        }
+    }
+}
