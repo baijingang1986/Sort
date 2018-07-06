@@ -25,20 +25,7 @@ public class GameSoundPoolManager {
     private void initSoundPool() {
         if (mSoundPool == null) {
             mSoundPool = new SoundPool(1, AudioManager.STREAM_MUSIC, 0);
-            mSparseArray.put(SoundType.MP3_1.ordinal(), mSoundPool.load(BaseApplication.getApplication(), R.raw.sound_1, 1));
-            mSparseArray.put(SoundType.MP3_2.ordinal(), mSoundPool.load(BaseApplication.getApplication(), R.raw.sound_2, 1));
-            mSparseArray.put(SoundType.MP3_3.ordinal(), mSoundPool.load(BaseApplication.getApplication(), R.raw.sound_3, 1));
-            mSparseArray.put(SoundType.MP3_4.ordinal(), mSoundPool.load(BaseApplication.getApplication(), R.raw.sound_4, 1));
-            mSparseArray.put(SoundType.MP3_5.ordinal(), mSoundPool.load(BaseApplication.getApplication(), R.raw.sound_5, 1));
-            mSparseArray.put(SoundType.MP3_6.ordinal(), mSoundPool.load(BaseApplication.getApplication(), R.raw.sound_6, 1));
-            mSparseArray.put(SoundType.MP3_7.ordinal(), mSoundPool.load(BaseApplication.getApplication(), R.raw.sound_7, 1));
-            mSparseArray.put(SoundType.MP3_8.ordinal(), mSoundPool.load(BaseApplication.getApplication(), R.raw.sound_8, 1));
-            mSparseArray.put(SoundType.MP3_9.ordinal(), mSoundPool.load(BaseApplication.getApplication(), R.raw.sound_9, 1));
-            mSparseArray.put(SoundType.MP3_10.ordinal(), mSoundPool.load(BaseApplication.getApplication(), R.raw.sound_10, 1));
-            mSparseArray.put(SoundType.MP3_11.ordinal(), mSoundPool.load(BaseApplication.getApplication(), R.raw.sound_11, 1));
-            mSparseArray.put(SoundType.MP3_12.ordinal(), mSoundPool.load(BaseApplication.getApplication(), R.raw.sound_12, 1));
-            mSparseArray.put(SoundType.MP3_13.ordinal(), mSoundPool.load(BaseApplication.getApplication(), R.raw.sound_13, 1));
-            mSparseArray.put(SoundType.MP3_14.ordinal(), mSoundPool.load(BaseApplication.getApplication(), R.raw.sound_14, 1));
+            mSparseArray.put(SoundType.MP3_1.ordinal(), mSoundPool.load(.getApplication(), R.raw.sound_1, 1));
         }
     }
 
