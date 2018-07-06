@@ -1,0 +1,148 @@
+
+
+import android.content.Context;
+import android.graphics.drawable.Drawable;
+import android.os.Build.VERSION;
+import android.support.v4.view.ViewPager;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.ViewParent;
+import android.view.View.OnTouchListener;
+import android.view.animation.AlphaAnimation;
+import android.view.animation.Animation;
+import android.view.animation.DecelerateInterpolator;
+import android.view.animation.Interpolator;
+import android.view.animation.Animation.AnimationListener;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
+import android.widget.Scroller;
+import android.widget.TextView;
+import java.lang.reflect.Field;
+
+public class ViewUtils {
+    public static final OnTouchListener EMPTY_TOUCH = new OnTouchListener() {
+        public boolean onTouch(View v, MotionEvent event) {
+            return true;
+        }
+    };
+
+    public ViewUtils() {
+    }
+
+    public static void eatTouch(View view) {
+        if(view != null) {
+            view.setOnTouchListener(EMPTY_TOUCH);
+        }
+
+    }
+
+    public static void removeLater(long duration, final View view) {
+        AlphaAnimation animation = new AlphaAnimation(1.0F, 0.0F);
+        animation.setDuration(500L);
+        animation.setStartOffset(duration);
+        animation.setAnimationListener(new AnimationListener() {
+            public void onAnimationStart(Animation animation) {
+            }
+
+            public void onAnimationEnd(Animation animation) {
+                ViewUtils.removeView(view);
+            }
+
+            public void onAnimationRepeat(Animation animation) {
+            }
+        });
+        view.startAnimation(animation);
+    }
+
+    public static void removeView(View view) {
+        if(view != null) {
+            ViewParent parent = view.getParent();
+            if(parent != null && parent instanceof ViewGroup) {
+                ((ViewGroup)parent).removeView(view);
+            }
+        }
+
+    }
+
+    public static void setBackground(View view, Drawable drawable) {
+        if(VERSION.SDK_INT > 15) {
+            view.setBackground(drawable);
+        } else {
+            view.setBackgroundDrawable(drawable);
+        }
+
+    }
+
+    public static void showSoftInput(final EditText input, final Context context) {
+        input.post(new Runnable() {
+            public void run() {
+                input.requestFocus();
+                input.setFocusable(true);
+                if(input.getWindowVisibility() == 0) {
+                    input.post(new Runnable() {
+                        public void run() {
+                            InputMethodManager inputMethodManager = (InputMethodManager)context.getSystemService("input_method");
+                            inputMethodManager.showSoftInput(input, 0);
+                        }
+                    });
+                }
+
+            }
+        });
+    }
+
+    public static void hideSoftInput(EditText input, Context context) {
+        input.clearFocus();
+        if(input.getWindowVisibility() == 0) {
+            InputMethodManager inputMethodManager = (InputMethodManager)context.getSystemService("input_method");
+            inputMethodManager.hideSoftInputFromWindow(input.getWindowToken(), 0);
+        }
+
+    }
+
+    public static void underLine(TextView textView) {
+        if(textView != null) {
+            textView.setPaintFlags(textView.getPaintFlags() | 8);
+        }
+
+    }
+
+    public static void setViewPagerScrollTime(ViewPager pager, int time) {
+        try {
+            Class<?> viewpager = ViewPager.class;
+            Field scroller = viewpager.getDeclaredField("mScroller");
+            scroller.setAccessible(true);
+            ViewUtils.FixedSpeedScroller mScroller = new ViewUtils.FixedSpeedScroller(pager.getContext(), new DecelerateInterpolator());
+            mScroller.setScrollDuration(time);
+            scroller.set(pager, mScroller);
+        } catch (Exception var5) {
+            ;
+        }
+
+    }
+
+    private static class FixedSpeedScroller extends Scroller {
+        private int mDuration = 300;
+
+        public FixedSpeedScroller(Context context) {
+            super(context);
+        }
+
+        public FixedSpeedScroller(Context context, Interpolator interpolator) {
+            super(context, interpolator);
+        }
+
+        public void startScroll(int startX, int startY, int dx, int dy, int duration) {
+            super.startScroll(startX, startY, dx, dy, this.mDuration);
+        }
+
+        public void startScroll(int startX, int startY, int dx, int dy) {
+            super.startScroll(startX, startY, dx, dy, this.mDuration);
+        }
+
+        public void setScrollDuration(int duration) {
+            this.mDuration = duration;
+        }
+    }
+}
