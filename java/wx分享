@@ -1,0 +1,420 @@
+
+import android.app.Activity;
+import android.content.Context;
+import android.graphics.Bitmap;
+
+import com.tencent.mm.opensdk.modelbase.BaseResp;
+import com.tencent.mm.opensdk.modelmsg.SendMessageToWX;
+import com.tencent.mm.opensdk.modelmsg.WXFileObject;
+import com.tencent.mm.opensdk.modelmsg.WXImageObject;
+import com.tencent.mm.opensdk.modelmsg.WXMediaMessage;
+import com.tencent.mm.opensdk.modelmsg.WXMiniProgramObject;
+import com.tencent.mm.opensdk.modelmsg.WXMusicObject;
+import com.tencent.mm.opensdk.modelmsg.WXWebpageObject;
+import com.tencent.mm.opensdk.openapi.IWXAPI;
+import com.tencent.mm.opensdk.openapi.WXAPIFactory;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+
+public class WxShareUtil {
+    private static String APP_ID;
+
+    static {
+        if (BaseApplication.isReleased()) {
+            APP_ID = 
+        } else {
+            APP_ID = 
+        }
+    }
+
+    /**
+     * 支持朋友圈的微信版本
+     */
+    private static final int TIMELINE_SUPPORTED_VERSION = 0x21020001;
+    private static final int THUMB_SIZE = 150;
+
+    private OnShareStatusListener onShareStatusListener;
+
+    public enum ShareType {
+        /**
+         * 朋友圈
+         */
+        TIMELINE,
+        /**
+         * 消息
+         */
+        SESSION
+    }
+
+    /**
+     * 检查分享的支持情况
+     *
+     * @param api
+     * @param shareType
+     * @param context
+     * @return
+     */
+    private boolean checkSupport(IWXAPI api, ShareType shareType, Context context) {
+        if (!api.isWXAppInstalled()) {
+            DialogUtil.showToast(context, R.string.common_weixin_not_installed, false);
+            return false;
+        }
+        if (!api.isWXAppSupportAPI()) {
+            DialogUtil.showToast(context, R.string.common_weixin_api_not_supported, false);
+            return false;
+        }
+        if (api.getWXAppSupportAPI() < TIMELINE_SUPPORTED_VERSION && shareType == ShareType.TIMELINE) {
+            DialogUtil.showToast(context, R.string.common_timeline_unsupport, false);
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * 分享一条URL到微信
+     *
+     * @param context
+     * @param shareType
+     * @param title
+     * @param content
+     * @param icon      分享的icon图片
+     * @param url       目标地址
+     */
+    public void sendUrlToWx(Activity context, ShareType shareType, String title, String content, File icon, String url) {
+        IWXAPI api = WXAPIFactory.createWXAPI(context, APP_ID);
+        if (!checkSupport(api, shareType, context)) {
+            if (onShareStatusListener != null) {
+                onShareStatusListener.onFail(OnShareStatusListener.ERROR_WX_NO_INSTALL);
+            }
+            return;
+        }
+        if (api.registerApp(APP_ID)) {
+            WXEntryActivity.setWXShareUtil(this);
+            WXWebpageObject webpageObject = new WXWebpageObject();
+            webpageObject.webpageUrl = url;
+            WXMediaMessage msg = new WXMediaMessage();
+            msg.mediaObject = webpageObject;
+            msg.title = shareType == ShareType.TIMELINE ? content : title;
+            msg.description = content;
+            Bitmap bitmap = BitmapUtil.getThumbnailBitmapFromFile(icon, THUMB_SIZE, THUMB_SIZE);
+            if (bitmap != null) {
+                FileUtils.delFile(icon);
+                msg.thumbData = BitmapUtil.bitmap2Bytes(bitmap, 80);
+                bitmap.recycle();
+            }
+            SendMessageToWX.Req req = new SendMessageToWX.Req();
+            req.transaction = String.valueOf(System.currentTimeMillis());
+            req.message = msg;
+            req.scene = shareType == ShareType.SESSION ? SendMessageToWX.Req.WXSceneSession : SendMessageToWX.Req.WXSceneTimeline;
+            // 调用api接口发送数据到微信
+            api.sendReq(req);
+        } else {
+            if (onShareStatusListener != null) {
+                onShareStatusListener.onFail(OnShareStatusListener.ERROR_WX_REGISTER_FAIL);
+            }
+            DialogUtil.showToast(context, R.string.common_share_weixin_fail, false);
+            if (shareType == ShareType.SESSION) {
+                StatisticsBase.onNlogStatEvent(StatisticsBase.STAT_EVENT.SHARE_ERROR, StatisticsBase.STAT_TAGS.SHARE_ERROR.WEIXIN);
+            } else {
+                StatisticsBase.onNlogStatEvent(StatisticsBase.STAT_EVENT.SHARE_ERROR, StatisticsBase.STAT_TAGS.SHARE_ERROR.TIMELINE);
+            }
+        }
+    }
+
+    /**
+     * 分享音频  分享到朋友圈后 可以直接点击播放 不用跳转
+     *
+     * @param context
+     * @param shareType
+     * @param title
+     * @param content
+     * @param icon
+     * @param url
+     */
+    public void sendAudioToWx(Activity context, ShareType shareType, String title, String content, File icon, String url, String audioUrl) {
+        IWXAPI api = WXAPIFactory.createWXAPI(context, APP_ID);
+        if (!checkSupport(api, shareType, context)) {
+            if (onShareStatusListener != null) {
+                onShareStatusListener.onFail(OnShareStatusListener.ERROR_WX_NO_INSTALL);
+            }
+            return;
+        }
+        if (api.registerApp(APP_ID)) {
+            WXEntryActivity.setWXShareUtil(this);
+            WXMusicObject webMusicObject = new WXMusicObject();
+            webMusicObject.musicUrl = url;
+            webMusicObject.musicDataUrl = audioUrl;
+
+            WXMediaMessage msg = new WXMediaMessage();
+            msg.mediaObject = webMusicObject;
+            msg.title = shareType == ShareType.TIMELINE ? content : title;
+            msg.description = content;
+            Bitmap bitmap = BitmapUtil.getThumbnailBitmapFromFile(icon, THUMB_SIZE, THUMB_SIZE);
+            if (bitmap != null) {
+                FileUtils.delFile(icon);
+                msg.thumbData = BitmapUtil.bitmap2Bytes(bitmap, 80);
+                bitmap.recycle();
+            }
+            SendMessageToWX.Req req = new SendMessageToWX.Req();
+            req.transaction = String.valueOf(System.currentTimeMillis());
+            req.message = msg;
+            req.scene = shareType == ShareType.SESSION ? SendMessageToWX.Req.WXSceneSession : SendMessageToWX.Req.WXSceneTimeline;
+            // 调用api接口发送数据到微信
+            api.sendReq(req);
+        } else {
+            if (onShareStatusListener != null) {
+                onShareStatusListener.onFail(OnShareStatusListener.ERROR_WX_REGISTER_FAIL);
+            }
+            DialogUtil.showToast(context, R.string.common_share_weixin_fail, false);
+            if (shareType == ShareType.SESSION) {
+                StatisticsBase.onNlogStatEvent(StatisticsBase.STAT_EVENT.SHARE_ERROR, StatisticsBase.STAT_TAGS.SHARE_ERROR.WEIXIN);
+            } else {
+                StatisticsBase.onNlogStatEvent(StatisticsBase.STAT_EVENT.SHARE_ERROR, StatisticsBase.STAT_TAGS.SHARE_ERROR.TIMELINE);
+            }
+        }
+    }
+
+    /**
+     * 发送一张图片到微信
+     *
+     * @param context   上下文
+     * @param shareType 分享类型(如果指定了分享类型为朋友圈，但是微信版本过低，则弹出提示
+     * @param imageFile 上传图片
+     * @return
+     */
+    public void sendImgToWx(Activity context, ShareType shareType, File imageFile) {
+        IWXAPI api = WXAPIFactory.createWXAPI(context, APP_ID);
+        if (!checkSupport(api, shareType, context)) {
+            if (onShareStatusListener != null) {
+                onShareStatusListener.onFail(OnShareStatusListener.ERROR_WX_NO_INSTALL);
+            }
+            return;
+        }
+        if (api.registerApp(APP_ID)) {
+            WXEntryActivity.setWXShareUtil(this);
+            WXImageObject imgObj = new WXImageObject();
+            ByteArrayOutputStream baos = null;
+            FileInputStream fis = null;
+            try {
+                fis = new FileInputStream(imageFile);
+                baos = new ByteArrayOutputStream();
+                FileUtils.copyStream(fis, baos);
+                imgObj.setImagePath(imageFile.getPath());
+                imgObj.imageData = baos.toByteArray();
+
+                WXMediaMessage msg = new WXMediaMessage();
+                msg.mediaObject = imgObj;
+
+                Bitmap thumbBmp = BitmapUtil.getThumbnailBitmapFromFile(imageFile, THUMB_SIZE, THUMB_SIZE);
+                if (thumbBmp != null) {
+                    msg.thumbData = BitmapUtil.bitmap2Bytes(thumbBmp, 70);
+                }
+                SendMessageToWX.Req req = new SendMessageToWX.Req();
+                req.transaction = System.currentTimeMillis() + "";
+                req.message = msg;
+                req.scene = shareType == ShareType.SESSION ? SendMessageToWX.Req.WXSceneSession : SendMessageToWX.Req.WXSceneTimeline;
+                api.sendReq(req);
+            } catch (Exception e) {
+                DialogUtil.showToast(context, R.string.common_share_weixin_fail, false);
+                if (shareType == ShareType.SESSION) {
+                    StatisticsBase.onNlogStatEvent(StatisticsBase.STAT_EVENT.SHARE_ERROR, StatisticsBase.STAT_TAGS.SHARE_ERROR.WEIXIN);
+                } else {
+                    StatisticsBase.onNlogStatEvent(StatisticsBase.STAT_EVENT.SHARE_ERROR, StatisticsBase.STAT_TAGS.SHARE_ERROR.TIMELINE);
+                }
+
+            } finally {
+                try {
+                    if (baos != null) {
+                        baos.close();
+                    }
+                    if (fis != null) {
+                        fis.close();
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        } else {
+            if (onShareStatusListener != null) {
+                onShareStatusListener.onFail(OnShareStatusListener.ERROR_WX_REGISTER_FAIL);
+            }
+            DialogUtil.showToast(context, R.string.common_share_weixin_fail, false);
+            if (shareType == ShareType.SESSION) {
+                StatisticsBase.onNlogStatEvent(StatisticsBase.STAT_EVENT.SHARE_ERROR, StatisticsBase.STAT_TAGS.SHARE_ERROR.WEIXIN);
+            } else {
+                StatisticsBase.onNlogStatEvent(StatisticsBase.STAT_EVENT.SHARE_ERROR, StatisticsBase.STAT_TAGS.SHARE_ERROR.TIMELINE);
+            }
+        }
+    }
+
+    public void sendProgram(Activity context, ShareType shareType, String title, String content, File icon, String url, String webPath) {
+        IWXAPI api = WXAPIFactory.createWXAPI(context, APP_ID);
+        if (!checkSupport(api, shareType, context)) {
+            if (onShareStatusListener != null) {
+                onShareStatusListener.onFail(OnShareStatusListener.ERROR_WX_NO_INSTALL);
+            }
+            return;
+        }
+        if (api.registerApp(APP_ID)) {
+            WXEntryActivity.setWXShareUtil(this);
+            WXMiniProgramObject miniProgramObj = new WXMiniProgramObject();
+            miniProgramObj.webpageUrl = url; // 兼容低版本的网页链接
+            miniProgramObj.miniprogramType = WXMiniProgramObject.MINIPTOGRAM_TYPE_RELEASE;// 正式版:0，测试版:1，体验版:2
+            miniProgramObj.userName = "gh_258a6ad88860";     // 小程序原始id
+            miniProgramObj.path = webPath;            //小程序页面路径
+            WXMediaMessage msg = new WXMediaMessage(miniProgramObj);
+            msg.title = title;                    // 小程序消息title
+            msg.description = content;               // 小程序消息desc
+            Bitmap bitmap = BitmapUtil.getThumbnailBitmapFromFile(icon, THUMB_SIZE, THUMB_SIZE);
+            if (bitmap != null) {
+                FileUtils.delFile(icon);
+                msg.thumbData = BitmapUtil.bitmap2Bytes(bitmap, 50); // 小程序消息封面图片，小于128k
+                bitmap.recycle();
+            }
+            SendMessageToWX.Req req = new SendMessageToWX.Req();
+            req.transaction = String.valueOf(System.currentTimeMillis());
+            req.message = msg;
+            req.scene = SendMessageToWX.Req.WXSceneSession;  // 目前支持会话
+            api.sendReq(req);
+        } else {
+            if (onShareStatusListener != null) {
+                onShareStatusListener.onFail(OnShareStatusListener.ERROR_WX_REGISTER_FAIL);
+            }
+            DialogUtil.showToast(context, R.string.common_share_weixin_fail, false);
+            if (shareType == ShareType.SESSION) {
+                StatisticsBase.onNlogStatEvent(StatisticsBase.STAT_EVENT.SHARE_ERROR, StatisticsBase.STAT_TAGS.SHARE_ERROR.WEIXIN);
+            } else {
+                StatisticsBase.onNlogStatEvent(StatisticsBase.STAT_EVENT.SHARE_ERROR, StatisticsBase.STAT_TAGS.SHARE_ERROR.TIMELINE);
+            }
+        }
+    }
+
+    /**
+     * 分享文件到微信
+     *
+     * @param context
+     * @param shareType
+     * @param file
+     */
+    public void sendFileToWx(Activity context, ShareType shareType, File file) {
+        if (file == null) {
+            ToastMaster.showToast("分享文件为空");
+            return;
+        }
+        IWXAPI api = WXAPIFactory.createWXAPI(context, APP_ID);
+        if (!checkSupport(api, shareType, context)) {
+            if (onShareStatusListener != null) {
+                onShareStatusListener.onFail(OnShareStatusListener.ERROR_WX_NO_INSTALL);
+            }
+            return;
+        }
+        //微信文件分享小于10M
+        if (file.length() > (1024 * 1024 * 10)) {
+            ToastMaster.showToast("文件超过10M，暂不支持");
+            return;
+        }
+        if (api.registerApp(APP_ID)) {
+            WXEntryActivity.setWXShareUtil(this);
+            WXFileObject fileObj = new WXFileObject();
+            try {
+                //文件路径
+                fileObj.filePath = file.getPath();
+                //使用媒体消息分享
+                WXMediaMessage msg = new WXMediaMessage();
+                msg.mediaObject = fileObj;
+                msg.title = file.getName();
+                //发送请求
+                SendMessageToWX.Req req = new SendMessageToWX.Req();
+                //创建唯一标识
+                req.transaction = System.currentTimeMillis() + "";
+                req.message = msg;
+                req.scene = shareType == ShareType.SESSION ? SendMessageToWX.Req.WXSceneSession : SendMessageToWX.Req.WXSceneTimeline;
+                LogcatHelper.i("SendToWXActivity", "mTargetScene--- ---" + msg);
+                api.sendReq(req);
+            } catch (Exception e) {
+                LogcatHelper.i("SendToWXActivity", "e--- ---" + e.toString());
+            }
+        } else {
+            if (onShareStatusListener != null) {
+                onShareStatusListener.onFail(OnShareStatusListener.ERROR_WX_REGISTER_FAIL);
+            }
+            DialogUtil.showToast(context, R.string.common_share_weixin_fail, false);
+            if (shareType == ShareType.SESSION) {
+                StatisticsBase.onNlogStatEvent(StatisticsBase.STAT_EVENT.SHARE_ERROR, StatisticsBase.STAT_TAGS.SHARE_ERROR.WEIXIN);
+            } else {
+                StatisticsBase.onNlogStatEvent(StatisticsBase.STAT_EVENT.SHARE_ERROR, StatisticsBase.STAT_TAGS.SHARE_ERROR.TIMELINE);
+            }
+        }
+    }
+
+    /**
+     * 分享的状态回调
+     *
+     * @param onShareStatusListener
+     */
+    public void setOnShareStatusListener(OnShareStatusListener onShareStatusListener) {
+        this.onShareStatusListener = onShareStatusListener;
+    }
+
+    public void onWxShareResp(int statusCode, String errorStr) {
+        switch (statusCode) {
+            case BaseResp.ErrCode.ERR_OK:
+                // common tip
+                DialogUtil.showToast(BaseApplication.getApplication(), R.string.common_share_succes, false);
+                if (onShareStatusListener != null) {
+                    onShareStatusListener.onSuccess();
+                }
+                break;
+            case BaseResp.ErrCode.ERR_USER_CANCEL:
+                if (onShareStatusListener != null) {
+                    onShareStatusListener.onFail(OnShareStatusListener.ERROR_CANCEL);
+                }
+                break;
+            default:
+                if (onShareStatusListener != null) {
+                    onShareStatusListener.onFail(OnShareStatusListener.ERROR_OTHER);
+                }
+                break;
+        }
+    }
+
+    /**
+     * 分享状态
+     */
+    public interface OnShareStatusListener {
+        /**
+         * 微信未安装，或者微信版本错误
+         */
+        int ERROR_WX_NO_INSTALL = -1;
+
+        /**
+         * 注册失败
+         */
+        int ERROR_WX_REGISTER_FAIL = -2;
+
+        /**
+         * 分享被取消
+         */
+        int ERROR_CANCEL = -3;
+
+        /**
+         * 其他错误
+         */
+        int ERROR_OTHER = -4;
+
+        /**
+         * 分享成功（暂不能完全定位分享成功，目前进到分享数据上传阶段之后，就认为分享成功了...相对还是比较靠谱-->也许吧,yeah）
+         */
+        void onSuccess();
+
+        /**
+         * 分享失败
+         *
+         * @param errorCode
+         */
+        void onFail(int errorCode);
+    }
+}
