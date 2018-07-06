@@ -1,0 +1,156 @@
+
+import android.app.Activity;
+import android.content.Context;
+import android.graphics.Rect;
+import android.os.Build.VERSION;
+import android.util.DisplayMetrics;
+import android.view.View;
+import android.view.WindowManager;
+import java.lang.reflect.Field;
+import java.util.concurrent.atomic.AtomicInteger;
+
+public class ScreenUtil {
+    private static int DPI_LEVEL = -1;
+    public static final int LEVEL_MDPI = 1;
+    public static final int LEVEL_HDPI = 2;
+    public static final int LEVEL_XHDPI = 3;
+    public static final int LEVEL_XXHDPI = 4;
+    private static float[] mScreenTypes = new float[]{0.5714286F, 0.6666667F, 0.75F, 0.6F};
+    private static final AtomicInteger sNextGeneratedId = new AtomicInteger(1);
+
+    public ScreenUtil() {
+    }
+
+    public static int getDpiLevel() {
+        if(DPI_LEVEL == -1) {
+            DPI_LEVEL = InitApplication.getApplication().getResources().getInteger(integer.dpi);
+            return DPI_LEVEL;
+        } else {
+            return DPI_LEVEL;
+        }
+    }
+
+    public static int dp2px(float dp) {
+        float scale = InitApplication.getApplication().getResources().getDisplayMetrics().density;
+        return (int)(dp * scale + 0.5F);
+    }
+
+    public static int dp2px(Context context, float dp) {
+        float scale = context.getResources().getDisplayMetrics().density;
+        return (int)(dp * scale + 0.5F);
+    }
+
+    public static int px2dp(float px) {
+        float scale = InitApplication.getApplication().getResources().getDisplayMetrics().density;
+        return (int)(px / scale + 0.5F);
+    }
+
+    public static int px2sp(float pxValue) {
+        float fontScale = InitApplication.getApplication().getResources().getDisplayMetrics().scaledDensity;
+        return (int)(pxValue / fontScale + 0.5F);
+    }
+
+    public static int sp2px(float spValue) {
+        float fontScale = InitApplication.getApplication().getResources().getDisplayMetrics().scaledDensity;
+        return (int)(spValue * fontScale + 0.5F);
+    }
+
+    public static Rect getViewRect(View view) {
+        Rect frame = new Rect();
+        ((Activity)view.getContext()).getWindow().getDecorView().getWindowVisibleDisplayFrame(frame);
+        Rect viewRect = new Rect();
+        view.getGlobalVisibleRect(viewRect);
+        Rect result = new Rect();
+        result.left = viewRect.left;
+        result.right = viewRect.right;
+        result.top = viewRect.top - frame.top;
+        result.bottom = viewRect.bottom - frame.top;
+        return result;
+    }
+
+    public static int getBarHeight1(Activity context) {
+        Rect frame = new Rect();
+        context.getWindow().getDecorView().getWindowVisibleDisplayFrame(frame);
+        return frame.top;
+    }
+
+    public static int getBarHeight(Context context) {
+        Class<?> c = null;
+        Object obj = null;
+        Field field = null;
+        int x = false;
+        int sbar = 38;
+
+        try {
+            c = Class.forName("com.android.internal.R$dimen");
+            obj = c.newInstance();
+            field = c.getField("status_bar_height");
+            int x = Integer.parseInt(field.get(obj).toString());
+            sbar = context.getResources().getDimensionPixelSize(x);
+        } catch (Exception var7) {
+            var7.printStackTrace();
+        }
+
+        return sbar;
+    }
+
+    private static DisplayMetrics getMetrics() {
+        DisplayMetrics metrics = new DisplayMetrics();
+        ((WindowManager)InitApplication.getApplication().getSystemService("window")).getDefaultDisplay().getMetrics(metrics);
+        return metrics;
+    }
+
+    public static int getScreenWidth() {
+        return getMetrics().widthPixels;
+    }
+
+    public static int getScreenHeight() {
+        return getMetrics().heightPixels;
+    }
+
+    public static float getScreenDensity() {
+        return getMetrics().density;
+    }
+
+    public static int getScreenRatioType() {
+        float ratio = (float)getScreenWidth() / (float)getScreenHeight();
+        float ratioMax = 3.4028235E38F;
+        int size = mScreenTypes.length;
+        int type = 0;
+
+        for(int i = 0; i < size; ++i) {
+            float currentDiff = Math.abs(mScreenTypes[i] - ratio);
+            if(currentDiff < ratioMax) {
+                ratioMax = currentDiff;
+                type = i;
+            }
+        }
+
+        return type + 1;
+    }
+
+    public static int getGenerateViewId() {
+        int i;
+        if(VERSION.SDK_INT < 17) {
+            i = generateViewId();
+            return i;
+        } else {
+            i = View.generateViewId();
+            return i;
+        }
+    }
+
+    public static int generateViewId() {
+        int result;
+        int newValue;
+        do {
+            result = sNextGeneratedId.get();
+            newValue = result + 1;
+            if(newValue > 16777215) {
+                newValue = 1;
+            }
+        } while(!sNextGeneratedId.compareAndSet(result, newValue));
+
+        return result;
+    }
+}
