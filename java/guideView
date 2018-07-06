@@ -1,0 +1,117 @@
+
+
+import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
+import android.graphics.Rect;
+import android.graphics.RectF;
+import android.util.AttributeSet;
+import android.view.View;
+import android.view.ViewTreeObserver;
+import android.widget.FrameLayout;
+
+public class BookGuideView extends FrameLayout {
+    private static final int ROUND_RADIUS = ScreenUtil.dp2px(7);
+    private RectF holeArea;
+    private Paint maskPaint;
+    private Paint holePaint;
+    int pl, pr, pt, pb; // padding
+    private int roundRadius = ROUND_RADIUS;
+
+    public BookGuideView(Context context) {
+        super(context);
+        init();
+    }
+
+    public BookGuideView(Context context, AttributeSet attrs) {
+        super(context, attrs);
+        init();
+    }
+
+    private void init() {
+        setWillNotDraw(false);
+        maskPaint = new Paint();
+        maskPaint.setColor(Color.argb((int)(255 / 4f * 3), 0, 0, 0));
+        maskPaint.setStyle(Paint.Style.FILL);
+
+        holePaint = new Paint();
+        holePaint.setColor(0xFF000000);
+        holePaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.CLEAR));
+        holePaint.setAntiAlias(true);
+    }
+
+    public interface OnHoleAreaCalculatedListener {
+        void onHoleAreaCalculated();
+    }
+
+    public void setHoleArea(int left, int top, int right, int bottom) {
+        holeArea = new RectF(left, top, right, bottom);
+    }
+
+    public void setHolePadding(int l, int t, int r, int b) {
+        pl = l;
+        pr = r;
+        pb = b;
+        pt = t;
+    }
+
+    public void setRoundRadius(int roundRadius) {
+        this.roundRadius = roundRadius;
+    }
+
+    public void setHoleArea(RectF holeArea) {
+        this.holeArea = holeArea;
+    }
+
+    /**
+     * @param uponWhich   突出显示哪一个View？
+     * @param insideWhich 突出显示的View和HoleView的共同的父View，其中HoleView需要填满该父View
+     */
+    public void setHoleArea(final View uponWhich, final View insideWhich, final OnHoleAreaCalculatedListener onHoleAreaCalculatedListener) {
+        uponWhich.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+            @Override
+            public boolean onPreDraw() {
+                uponWhich.getViewTreeObserver().removeOnPreDrawListener(this);
+                Rect rect = new Rect();
+                uponWhich.getGlobalVisibleRect(rect);
+                int lx = rect.left;
+                int ly = rect.top;
+                insideWhich.getGlobalVisibleRect(rect);
+                int ix = rect.left;
+                int iy = rect.top;
+
+                int left = lx - ix;
+                int top = ly - iy;
+
+                int width = uponWhich.getMeasuredWidth();
+                int height = uponWhich.getMeasuredHeight();
+                int right = left + width;
+                int bottom = top + height;
+
+                setHoleArea(left - pl, top - pt, right + pr, bottom + pb);
+                if (onHoleAreaCalculatedListener != null) {
+                    onHoleAreaCalculatedListener.onHoleAreaCalculated();
+                }
+                invalidate();
+                return false;
+            }
+        });
+        uponWhich.postInvalidate();
+    }
+
+    public RectF getHoleArea() {
+        return holeArea;
+    }
+
+    @Override
+    protected void onDraw(Canvas canvas) {
+        super.onDraw(canvas);
+        canvas.drawRect(0, 0, getWidth(), getHeight(), maskPaint);
+        if (holeArea != null) {
+            canvas.drawRoundRect(holeArea, roundRadius, roundRadius, holePaint);
+        }
+    }
+}
