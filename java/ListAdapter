@@ -1,0 +1,203 @@
+//
+import android.content.Context;
+import android.util.SparseIntArray;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.BaseAdapter;
+import java.util.HashSet;
+import java.util.Set;
+
+public abstract class SimpleListAdapter2<ItemType, Holder extends SimpleListAdapter2.ViewHolder> extends BaseAdapter {
+    protected Context context;
+    private SparseIntArray itemTypeMap;
+    private int itemTypeCount;
+    private int singleItemLayoutId;
+
+    public SimpleListAdapter2(Context context, int[]... itemTypes) {
+        this.context = context;
+        isItemTypesValid(itemTypes);
+        this.itemTypeCount = itemTypes.length;
+        this.itemTypeMap = new SparseIntArray(this.itemTypeCount);
+        int[][] var3 = itemTypes;
+        int var4 = itemTypes.length;
+
+        for(int var5 = 0; var5 < var4; ++var5) {
+            int[] itemType = var3[var5];
+            this.itemTypeMap.put(itemType[0], itemType[1]);
+        }
+
+    }
+
+    private static void isItemTypesValid(int[]... itemTypes) {
+        if(itemTypes != null && itemTypes.length != 0) {
+            Set<Integer> itemTypeSet = new HashSet();
+            Set<Integer> layoutIdSet = new HashSet();
+            int[][] var3 = itemTypes;
+            int var4 = itemTypes.length;
+
+            for(int var5 = 0; var5 < var4; ++var5) {
+                int[] itemType = var3[var5];
+                if(itemType[0] < 0 || itemType[0] >= itemTypes.length) {
+                    throw new RuntimeException("itemType的值：" + itemType[0] + "超过了itemTypes的总数：" + itemTypes.length + "，itemType必须从0开始依次递增");
+                }
+
+                itemTypeSet.add(Integer.valueOf(itemType[0]));
+                layoutIdSet.add(Integer.valueOf(itemType[1]));
+            }
+
+            if(itemTypeSet.size() < itemTypes.length || layoutIdSet.size() < itemTypes.length) {
+                throw new RuntimeException("已经有相同的itemType存在，请检查构造SimpleListAdapter的itemTypes数组是否有重复");
+            }
+        } else {
+            throw new RuntimeException("itemTypes不能为空");
+        }
+    }
+
+    public SimpleListAdapter2(Context context, int itemLayoutId) {
+        this.context = context;
+        this.singleItemLayoutId = itemLayoutId;
+        this.itemTypeCount = 1;
+    }
+
+    public long getItemId(int position) {
+        return (long)position;
+    }
+
+    public final int getViewTypeCount() {
+        return this.itemTypeCount;
+    }
+
+    public final View getView(int position, View convertView, ViewGroup parent) {
+        ItemType item = this.getItem(position);
+        if(item == null) {
+            View empty = new View(this.context);
+            empty.setVisibility(8);
+            return empty;
+        } else {
+            SimpleListAdapter2.ViewHolder holder;
+            if(convertView == null) {
+                int layoutId;
+                if(this.itemTypeMap == null) {
+                    layoutId = this.singleItemLayoutId;
+                } else {
+                    layoutId = this.itemTypeMap.get(this.getItemViewType(position));
+                    if(layoutId == 0) {
+                        throw new RuntimeException(String.format("找不到对应的LayoutId(postion=%d itemType=%d),您是否没有覆盖SimpleListAdapter.getItemViewType方法?", new Object[]{Integer.valueOf(position), Integer.valueOf(this.getItemViewType(position))}));
+                    }
+                }
+
+                convertView = LayoutInflater.from(this.context).inflate(layoutId, parent, false);
+                holder = this.onCreateViewHolder(convertView, this.getItemViewType(position));
+                convertView.setTag(holder);
+            } else {
+                holder = (SimpleListAdapter2.ViewHolder)convertView.getTag();
+            }
+
+            this.bindView(position, holder, item);
+            return convertView;
+        }
+    }
+
+    protected abstract void bindView(int var1, Holder var2, ItemType var3);
+
+    protected abstract Holder onCreateViewHolder(View var1, int var2);
+
+    public abstract ItemType getItem(int var1);
+
+    public interface ViewHolder {
+    }
+}
+
+
+------------------------------------------------------------------------------------
+
+import android.app.Activity;
+import android.content.Context;
+import android.view.View;
+import android.widget.TextView;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class FreeBooksAdapter extends SimpleListAdapter2<DrawBookRecommend.FreeBooksItem, FreeBooksAdapter.Holder> {
+    private List<DrawBookRecommend.FreeBooksItem> mFreeBooks = new ArrayList<>();
+    private Activity mActivity;
+
+    public FreeBooksAdapter(Context context) {
+        super(context, R.layout.adapter_limit_free_book_item);
+        mActivity = (Activity) context;
+    }
+
+    public void appendBookData(List<DrawBookRecommend.FreeBooksItem> datas) {
+        if (datas != null) {
+            mFreeBooks.addAll(datas);
+        }
+        notifyDataSetChanged();
+    }
+
+    public void updateBookData(List<DrawBookRecommend.FreeBooksItem> datas) {
+        mFreeBooks.clear();
+        if (datas != null) {
+            mFreeBooks.addAll(datas);
+        }
+        notifyDataSetChanged();
+    }
+
+    private void goToRead(int position) {
+        if (position < mFreeBooks.size()) {
+            DrawBookRecommend.FreeBooksItem itemData = getItem(position);
+            mActivity.startActivity(BookCoverActivity.createIntent(mActivity, itemData.bookId));
+            StatConstants.statBySubjectAndBook(StatConstants.PB_BOOK_RECOMMEND_FREE_BOOK_CLICK, String.valueOf(itemData.bookId));
+        }
+    }
+    @Override
+    protected void bindView(final int position, final Holder holder, DrawBookRecommend.FreeBooksItem item) {
+        if (item == null) {
+            return;
+        }
+        holder.mBookCover.bind(item.icon, R.drawable.book_book_holder, R.drawable.book_book_holder);
+        holder.mBookTitle.setText(item.name);
+        holder.mBookDescription.setText(item.introduce);
+        holder.mBookCover.setOnClickListener(new View.OnClickListener(){
+            @Override
+            public void onClick(View v) {
+                goToRead(position);
+            }
+        });
+        holder.mToRead.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                goToRead(position);
+            }
+        });
+    }
+
+    @Override
+    public Holder onCreateViewHolder(View view, int itemViewType) {
+        Holder holder = new Holder();
+        holder.mBookCover = view.findViewById(R.id.alfbi_book_cover);
+        holder.mBookTitle = view.findViewById(R.id.alfbi_book_title);
+        holder.mBookDescription = view.findViewById(R.id.alfbi_book_desc_text);
+        holder.mToRead = view.findViewById(R.id.alfbi_to_read);
+        return holder;
+    }
+
+    @Override
+    public int getCount() {
+        return mFreeBooks == null ? 0 : mFreeBooks.size();
+    }
+
+    @Override
+    public DrawBookRecommend.FreeBooksItem getItem(int position) {
+        return mFreeBooks.get(position);
+    }
+
+    class Holder implements SimpleListAdapter2.ViewHolder {
+        RecyclingImageView mBookCover;
+        TextView mBookTitle;
+        TextView mBookDescription;
+        TextView mToRead;
+    }
+}
+
