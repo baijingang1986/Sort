@@ -1,0 +1,825 @@
+
+import android.content.Context;
+import android.os.Environment;
+import android.os.StatFs;
+import android.text.TextUtils;
+import com.google.jtm.Gson;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.BufferedWriter;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.math.BigInteger;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
+import org.json.JSONObject;
+
+public class FileUtils {
+    private static final int BUFFER_SIZE = 8192;
+    private static final int BUFF_SIZE = 1048576;
+
+    public FileUtils() {
+    }
+
+    public static Object unserializeObject(String path) {
+        File file = new File(path);
+        if(!file.exists()) {
+            return null;
+        } else {
+            ObjectInputStream ois = null;
+            Object o = null;
+
+            Object var5;
+            try {
+                ois = new ObjectInputStream(new FileInputStream(path));
+                o = ois.readObject();
+                return o;
+            } catch (Exception var15) {
+                file.delete();
+                var5 = null;
+            } finally {
+                if(ois != null) {
+                    try {
+                        ois.close();
+                    } catch (IOException var14) {
+                        ;
+                    }
+                }
+
+            }
+
+            return var5;
+        }
+    }
+
+    public static boolean serializeObject(String path, Object o) {
+        ObjectOutputStream oos = null;
+
+        boolean var5;
+        try {
+            boolean var4;
+            try {
+                oos = new ObjectOutputStream(new FileOutputStream(path));
+                oos.writeObject(o);
+                return true;
+            } catch (FileNotFoundException var19) {
+                var4 = false;
+                return var4;
+            } catch (IOException var20) {
+                File file = new File(path);
+                if(file.exists() && file.isFile()) {
+                    file.delete();
+                }
+            } catch (Exception var21) {
+                var4 = false;
+                return var4;
+            }
+
+            var5 = false;
+        } finally {
+            try {
+                if(oos != null) {
+                    oos.close();
+                }
+            } catch (Exception var18) {
+                return false;
+            }
+
+        }
+
+        return var5;
+    }
+
+    public static boolean isExternalStorageCanWrite() {
+        return Environment.getExternalStorageDirectory().canWrite();
+    }
+
+    public static boolean isExternalStorageWritable() {
+        String state = Environment.getExternalStorageState();
+        return "mounted".equals(state);
+    }
+
+    public static long getFreeSpace(File path) {
+        long size = 0L;
+
+        try {
+            if(path.exists() && path.isDirectory()) {
+                StatFs stat = new StatFs(path.getAbsolutePath());
+                size = (long)stat.getAvailableBlocks() * (long)stat.getBlockSize();
+            }
+        } catch (Throwable var4) {
+            ;
+        }
+
+        return size;
+    }
+
+    public static boolean writeFile(String path, byte[] data) {
+        if(data == null) {
+            return false;
+        } else {
+            BufferedOutputStream bos = null;
+
+            boolean var4;
+            try {
+                bos = new BufferedOutputStream(new FileOutputStream(path));
+                bos.write(data, 0, data.length);
+                boolean var3 = true;
+                return var3;
+            } catch (Exception var14) {
+                var14.printStackTrace();
+                var4 = false;
+            } finally {
+                if(bos != null) {
+                    try {
+                        bos.close();
+                    } catch (IOException var13) {
+                        var13.printStackTrace();
+                    }
+                }
+
+            }
+
+            return var4;
+        }
+    }
+
+    public static boolean writeFile(String savePath, File inFile) {
+        BufferedInputStream bis = null;
+        BufferedOutputStream bos = null;
+
+        boolean var5;
+        try {
+            bis = new BufferedInputStream(new FileInputStream(inFile));
+            bos = new BufferedOutputStream(new FileOutputStream(savePath));
+            byte[] buffer = new byte[1024];
+
+            int len;
+            while((len = bis.read(buffer)) != -1) {
+                bos.write(buffer, 0, len);
+            }
+
+            boolean var6 = true;
+            return var6;
+        } catch (Exception var20) {
+            var20.printStackTrace();
+            var5 = false;
+        } finally {
+            if(bis != null) {
+                try {
+                    bis.close();
+                } catch (IOException var19) {
+                    var19.printStackTrace();
+                }
+            }
+
+            if(bos != null) {
+                try {
+                    bos.close();
+                } catch (IOException var18) {
+                    var18.printStackTrace();
+                }
+            }
+
+        }
+
+        return var5;
+    }
+
+    public static boolean writeJsonRecord(String path, ArrayList<JSONObject> content) {
+        if(null != content && !content.isEmpty()) {
+            if(TextUtils.isEmpty(path)) {
+                return false;
+            } else {
+                BufferedWriter writer = null;
+                FileOutputStream fos = null;
+
+                boolean var5;
+                try {
+                    fos = new FileOutputStream(path);
+                    writer = new BufferedWriter(new OutputStreamWriter(fos));
+                    int len = content.size();
+
+                    for(int i = 0; i < len; ++i) {
+                        JSONObject jsonObject = (JSONObject)content.get(i);
+                        writer.write(jsonObject.toString() + "\n");
+                    }
+
+                    var5 = true;
+                    return var5;
+                } catch (IOException var19) {
+                    var5 = false;
+                } finally {
+                    if(writer != null) {
+                        try {
+                            writer.close();
+                        } catch (IOException var18) {
+                            var18.printStackTrace();
+                        }
+                    }
+
+                    if(fos != null) {
+                        try {
+                            fos.close();
+                        } catch (IOException var17) {
+                            var17.printStackTrace();
+                        }
+                    }
+
+                }
+
+                return var5;
+            }
+        } else {
+            return false;
+        }
+    }
+
+    public static boolean writeUtfStrings(String path, List<String> content) {
+        if(null != content && !content.isEmpty()) {
+            if(TextUtils.isEmpty(path)) {
+                return false;
+            } else {
+                System.err.println("log_..FileUtils.writeUtfStrings.path = [" + path + "], content = [" + content.size() + "]");
+                DataOutputStream writer = null;
+                FileOutputStream fos = null;
+
+                boolean var5;
+                try {
+                    fos = new FileOutputStream(path);
+                    writer = new DataOutputStream(fos);
+                    int len = content.size();
+                    writer.writeInt(len);
+
+                    for(int i = 0; i < len; ++i) {
+                        writer.writeUTF(TextUtils.isEmpty((CharSequence)content.get(i))?"":(String)content.get(i));
+                    }
+
+                    writer.flush();
+                    var5 = true;
+                    return var5;
+                } catch (IOException var19) {
+                    var5 = false;
+                } finally {
+                    if(writer != null) {
+                        try {
+                            writer.close();
+                        } catch (IOException var18) {
+                            var18.printStackTrace();
+                        }
+                    }
+
+                    if(fos != null) {
+                        try {
+                            fos.close();
+                        } catch (IOException var17) {
+                            var17.printStackTrace();
+                        }
+                    }
+
+                }
+
+                return var5;
+            }
+        } else {
+            return false;
+        }
+    }
+
+    public static boolean writeFile(String path, String content) {
+        if(null == content) {
+            return false;
+        } else {
+            BufferedWriter writer = null;
+            FileOutputStream fos = null;
+
+            boolean var21;
+            try {
+                File file = new File(path);
+                if(!file.getParentFile().exists()) {
+                    file.mkdirs();
+                }
+
+                fos = new FileOutputStream(file);
+                writer = new BufferedWriter(new OutputStreamWriter(fos));
+                writer.write(content);
+                writer.flush();
+                var21 = true;
+                return var21;
+            } catch (Exception var19) {
+                if(!TextUtils.isEmpty(content)) {
+                    ByteArrayOutputStream buf = new ByteArrayOutputStream();
+                    var19.printStackTrace(new PrintWriter(buf, true));
+                    String var6 = buf.toString();
+                }
+
+                var21 = false;
+            } finally {
+                if(writer != null) {
+                    try {
+                        writer.close();
+                    } catch (IOException var18) {
+                        var18.printStackTrace();
+                    }
+                }
+
+                if(fos != null) {
+                    try {
+                        fos.close();
+                    } catch (IOException var17) {
+                        var17.printStackTrace();
+                    }
+                }
+
+            }
+
+            return var21;
+        }
+    }
+
+    public static byte[] readFile(File file) {
+        byte[] result = null;
+        FileInputStream fis = null;
+        BufferedInputStream bis = null;
+
+        try {
+            int fileSize = (int)file.length();
+            result = new byte[fileSize];
+            fis = new FileInputStream(file);
+            bis = new BufferedInputStream(fis);
+            bis.read(result, 0, fileSize);
+        } catch (FileNotFoundException var20) {
+            var20.printStackTrace();
+        } catch (IOException var21) {
+            var21.printStackTrace();
+        } finally {
+            if(fis != null) {
+                try {
+                    fis.close();
+                } catch (IOException var19) {
+                    var19.printStackTrace();
+                }
+            }
+
+            if(bis != null) {
+                try {
+                    bis.close();
+                } catch (IOException var18) {
+                    var18.printStackTrace();
+                }
+            }
+
+        }
+
+        return result;
+    }
+
+    public static boolean delFile(File file) {
+        return null == file?false:(file.exists()?file.delete():true);
+    }
+
+    public static boolean delFile(String path) {
+        return delFile(new File(path));
+    }
+
+    public static void clearDir(File dir) {
+        if(dir.isDirectory()) {
+            File[] files = dir.listFiles();
+            if(files != null) {
+                File[] var2 = files;
+                int var3 = files.length;
+
+                for(int var4 = 0; var4 < var3; ++var4) {
+                    File file = var2[var4];
+                    if(file.isDirectory()) {
+                        deleteDir(dir);
+                    } else {
+                        delFile(file);
+                    }
+                }
+            }
+        }
+
+    }
+
+    public static void deleteDir(File dir) {
+        if(dir.isDirectory()) {
+            File[] files = dir.listFiles();
+            if(files == null) {
+                dir.delete();
+                return;
+            }
+
+            for(int i = 0; i < files.length; ++i) {
+                deleteDir(files[i]);
+            }
+
+            dir.delete();
+        } else {
+            dir.delete();
+        }
+
+    }
+
+    public static byte[] readInputStream(InputStream input) {
+        byte[] data = null;
+
+        try {
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            byte[] buffer = new byte[1024];
+            boolean var4 = false;
+
+            int len;
+            while((len = input.read(buffer)) != -1) {
+                output.write(buffer, 0, len);
+            }
+
+            data = output.toByteArray();
+            output.close();
+            input.close();
+        } catch (IOException var5) {
+            var5.printStackTrace();
+        }
+
+        return data;
+    }
+
+    public static void copyStream(InputStream is, OutputStream os) throws IOException {
+        if(is != null && os != null) {
+            byte[] bytes = new byte[8192];
+
+            while(true) {
+                int count = is.read(bytes, 0, 8192);
+                if(count == -1) {
+                    return;
+                }
+
+                os.write(bytes, 0, count);
+            }
+        } else {
+            throw new IOException("Argument is null.");
+        }
+    }
+
+    public static byte[] gunzip(byte[] input) {
+        GZIPInputStream inputStream = null;
+        ByteArrayOutputStream bos = null;
+
+        try {
+            inputStream = new GZIPInputStream(new ByteArrayInputStream(input));
+            bos = new ByteArrayOutputStream();
+            copyStream(inputStream, bos);
+        } catch (IOException var16) {
+            var16.printStackTrace();
+        } finally {
+            if(inputStream != null) {
+                try {
+                    inputStream.close();
+                } catch (IOException var15) {
+                    var15.printStackTrace();
+                }
+            }
+
+            if(bos != null) {
+                try {
+                    bos.close();
+                } catch (IOException var14) {
+                    var14.printStackTrace();
+                }
+            }
+
+        }
+
+        return bos != null?bos.toByteArray():null;
+    }
+
+    public static void copy(File src, File des) throws IOException {
+        if(des.exists()) {
+            des.delete();
+        }
+
+        FileInputStream fis = new FileInputStream(src);
+        FileOutputStream fos = new FileOutputStream(des);
+
+        try {
+            copyStream(fis, fos);
+        } catch (IOException var8) {
+            throw var8;
+        } finally {
+            fis.close();
+            fos.close();
+        }
+
+    }
+
+    public static void cut(File src, File des) throws IOException {
+        copy(src, des);
+        delFile(src);
+    }
+
+    public static boolean readRawIntoFile(Context context, int rawResId, File file) {
+        OutputStream os = null;
+        InputStream is = null;
+        if(file.exists()) {
+            delFile(file);
+        }
+
+        boolean var6;
+        try {
+            os = new FileOutputStream(file);
+            is = context.getResources().openRawResource(rawResId);
+            copyStream(is, os);
+            boolean var5 = true;
+            return var5;
+        } catch (IOException var16) {
+            var6 = false;
+        } finally {
+            try {
+                if(os != null) {
+                    os.close();
+                }
+
+                if(is != null) {
+                    is.close();
+                }
+            } catch (IOException var15) {
+                var15.printStackTrace();
+            }
+
+        }
+
+        return var6;
+    }
+
+    public static boolean unzip(String filePath, String outPath, boolean delSrc, int bufSize) {
+        ZipInputStream inputStream = null;
+        BufferedOutputStream out = null;
+        BufferedInputStream in = null;
+
+        try {
+            inputStream = new ZipInputStream(new FileInputStream(filePath));
+            File outDirectory = new File(outPath);
+            if(!outDirectory.isDirectory() && !outDirectory.mkdirs()) {
+                throw new FileNotFoundException();
+            }
+
+            in = new BufferedInputStream(inputStream);
+            bufSize = Math.max(bufSize, 1024);
+            byte[] buffer = new byte[bufSize];
+
+            ZipEntry entry;
+            while((entry = inputStream.getNextEntry()) != null) {
+                try {
+                    String name = entry.getName();
+                    if(!entry.isDirectory()) {
+                        File file = new File(outPath, name);
+                        File folder = file.getParentFile();
+                        if(folder == null || !folder.exists() && !folder.mkdirs()) {
+                            throw new FileNotFoundException();
+                        }
+
+                        out = new BufferedOutputStream(new FileOutputStream(file));
+
+                        int len;
+                        while((len = in.read(buffer)) != -1) {
+                            out.write(buffer, 0, len);
+                        }
+
+                        out.flush();
+                    }
+                } finally {
+                    if(out != null) {
+                        try {
+                            out.close();
+                        } catch (IOException var36) {
+                            var36.printStackTrace();
+                        }
+                    }
+
+                }
+            }
+
+            boolean var41 = true;
+            return var41;
+        } catch (FileNotFoundException var38) {
+            ;
+        } catch (IOException var39) {
+            ;
+        } finally {
+            if(in != null) {
+                try {
+                    in.close();
+                } catch (IOException var35) {
+                    ;
+                }
+            }
+
+            if(delSrc) {
+                delFile(filePath);
+            }
+
+        }
+
+        return false;
+    }
+
+    public static boolean writeEntity(Object entity, String filePath) {
+        Gson gson = GsonBuilderFactory.createBuilder();
+
+        try {
+            if(entity instanceof String) {
+                return writeFile(filePath, (String)entity);
+            } else {
+                String json = gson.toJson(entity);
+                return writeFile(filePath, json);
+            }
+        } catch (Exception var4) {
+            return false;
+        }
+    }
+
+    public static <T> T readEntity(Class<T> clazz, String filePath) {
+        File file = new File(filePath);
+        if(file.exists()) {
+            if(clazz == String.class) {
+                return new String(readFile(file));
+            } else {
+                Gson gson = GsonBuilderFactory.createBuilder();
+
+                try {
+                    String json = new String(readFile(file));
+                    return gson.fromJson(json, clazz);
+                } catch (Exception var5) {
+                    var5.printStackTrace();
+                    return null;
+                }
+            }
+        } else {
+            return null;
+        }
+    }
+
+    public static boolean isApk(File file) {
+        if(file != null && file.exists()) {
+            ZipInputStream zipInputStream = null;
+
+            try {
+                zipInputStream = new ZipInputStream(new FileInputStream(file));
+
+                ZipEntry ze;
+                do {
+                    if((ze = zipInputStream.getNextEntry()) == null) {
+                        return false;
+                    }
+                } while(!ze.getName().equals("AndroidManifest.xml"));
+
+                boolean var3 = true;
+                return var3;
+            } catch (Exception var14) {
+                return false;
+            } finally {
+                try {
+                    if(zipInputStream != null) {
+                        zipInputStream.close();
+                    }
+                } catch (IOException var13) {
+                    ;
+                }
+
+            }
+        } else {
+            return false;
+        }
+    }
+
+    public static String md5(File updateFile) {
+        MessageDigest digest;
+        try {
+            digest = MessageDigest.getInstance("MD5");
+        } catch (NoSuchAlgorithmException var20) {
+            return null;
+        }
+
+        FileInputStream is;
+        try {
+            is = new FileInputStream(updateFile);
+        } catch (FileNotFoundException var19) {
+            return null;
+        }
+
+        byte[] buffer = new byte[8192];
+
+        String var8;
+        try {
+            int read;
+            while((read = is.read(buffer)) > 0) {
+                digest.update(buffer, 0, read);
+            }
+
+            byte[] md5sum = digest.digest();
+            BigInteger bigInt = new BigInteger(1, md5sum);
+            String output = bigInt.toString(16);
+            output = String.format("%32s", new Object[]{output}).replace(' ', '0');
+            var8 = output;
+        } catch (IOException var21) {
+            throw new RuntimeException("Unable to process file for MD5", var21);
+        } finally {
+            try {
+                is.close();
+            } catch (IOException var18) {
+                ;
+            }
+
+        }
+
+        return var8;
+    }
+
+    public static void zipFiles(Collection<File> resFileList, File zipFile, String comment) throws IOException {
+        ZipOutputStream zipout = new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(zipFile), 1048576));
+        Iterator var4 = resFileList.iterator();
+
+        while(var4.hasNext()) {
+            File resFile = (File)var4.next();
+            zipFile(resFile, zipout, "");
+        }
+
+        zipout.setComment(comment);
+        zipout.close();
+    }
+
+    public static void zipFile(File src, File zipFile, String comment) throws IOException {
+        ZipOutputStream zipout = new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(zipFile), 1048576));
+        zipFile(src, zipout, "");
+        zipout.setComment(comment);
+        zipout.close();
+    }
+
+    private static void zipFile(File resFile, ZipOutputStream zipout, String rootpath) throws FileNotFoundException, IOException {
+        rootpath = rootpath + (rootpath.trim().length() == 0?"":File.separator) + resFile.getName();
+        rootpath = new String(rootpath.getBytes("8859_1"), "GB2312");
+        int realLength;
+        if(resFile.isDirectory()) {
+            File[] fileList = resFile.listFiles();
+            File[] var4 = fileList;
+            realLength = fileList.length;
+
+            for(int var6 = 0; var6 < realLength; ++var6) {
+                File file = var4[var6];
+                zipFile(file, zipout, rootpath);
+            }
+        } else {
+            byte[] buffer = new byte[1048576];
+            BufferedInputStream in = new BufferedInputStream(new FileInputStream(resFile), 1048576);
+            zipout.putNextEntry(new ZipEntry(rootpath));
+
+            while((realLength = in.read(buffer)) != -1) {
+                zipout.write(buffer, 0, realLength);
+            }
+
+            in.close();
+            zipout.flush();
+            zipout.closeEntry();
+        }
+
+    }
+}
+
+/**
+     *
+     * @param bookId
+     * @return is unzipped book exist
+     */
+    public boolean isBookExist(final String bookId) {
+        File bookFolder = DirectoryManager.getDirectory(bookDir);
+        if (bookFolder != null) {
+            File[] books = bookFolder.listFiles(new FileFilter() {
+                @Override
+                public boolean accept(File file) {
+                    return !file.isFile() && file.getName().startsWith(bookId);
+                }
+            });
+            return books != null && books.length > 0;
+        }
+        return false;
+    }
