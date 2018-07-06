@@ -1,0 +1,119 @@
+
+
+import android.os.Build;
+import android.provider.Settings.Secure;
+import android.telephony.TelephonyManager;
+import android.text.TextUtils;
+import java.io.UnsupportedEncodingException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+
+public class DeviceUtils {
+    public DeviceUtils() {
+    }
+
+    public static String getImei() {
+        return ((TelephonyManager)InitApplication.getApplication().getSystemService("phone")).getDeviceId();
+    }
+
+    public static String getAndroidId() {
+        return Secure.getString(InitApplication.getApplication().getContentResolver(), "android_id");
+    }
+
+    public static int getDeviceType() {
+        int width = ScreenUtil.getScreenWidth();
+        int widthDpi = ScreenUtil.px2dp((float)width);
+        return widthDpi >= 600?1:(width < 240?2:0);
+    }
+
+    public static boolean brandEquals(String brand) {
+        String selfBrand = Build.MANUFACTURER;
+        if(TextUtils.isEmpty(selfBrand)) {
+            selfBrand = Build.BRAND;
+        }
+
+        return brand == null?false:brand.equalsIgnoreCase(selfBrand);
+    }
+
+    public static boolean modelEquals(String model) {
+        String selfBrand = Build.MODEL;
+        return selfBrand == null?false:selfBrand.equalsIgnoreCase(model);
+    }
+
+    public static String getProviderName() {
+        String ProvidersName = "未知";
+
+        try {
+            TelephonyManager telManager = (TelephonyManager)InitApplication.getApplication().getSystemService("phone");
+            String operator = telManager.getSimOperator();
+            if(operator != null) {
+                if(!operator.equals("46000") && !operator.equals("46002") && !operator.equals("46007")) {
+                    if(operator.equals("46001")) {
+                        ProvidersName = "中国联通";
+                    } else if(operator.equals("46003")) {
+                        ProvidersName = "中国电信";
+                    }
+                } else {
+                    ProvidersName = "中国移动";
+                }
+            }
+
+            String IMSI = telManager.getSubscriberId();
+            if(IMSI != null) {
+                if(!IMSI.startsWith("46000") && !IMSI.startsWith("46002") && !IMSI.startsWith("46007")) {
+                    if(IMSI.startsWith("46001")) {
+                        ProvidersName = "中国联通";
+                    } else if(IMSI.startsWith("46003")) {
+                        ProvidersName = "中国电信";
+                    }
+                } else {
+                    ProvidersName = "中国移动";
+                }
+            }
+        } catch (Exception var4) {
+            var4.printStackTrace();
+        }
+
+        return ProvidersName;
+    }
+
+    public static String sha1AndroidId() {
+        String id = getAndroidId();
+        String result = "";
+
+        try {
+            result = sha1(id).toLowerCase();
+        } catch (Exception var3) {
+            ;
+        }
+
+        return result;
+    }
+
+    private static String convertToHex(byte[] data) {
+        StringBuilder buf = new StringBuilder();
+        byte[] var2 = data;
+        int var3 = data.length;
+
+        for(int var4 = 0; var4 < var3; ++var4) {
+            byte b = var2[var4];
+            int halfbyte = b >>> 4 & 15;
+            int var7 = 0;
+
+            do {
+                buf.append(0 <= halfbyte && halfbyte <= 9?(char)(48 + halfbyte):(char)(97 + (halfbyte - 10)));
+                halfbyte = b & 15;
+            } while(var7++ < 1);
+        }
+
+        return buf.toString();
+    }
+
+    public static String sha1(String text) throws NoSuchAlgorithmException, UnsupportedEncodingException {
+        MessageDigest md = MessageDigest.getInstance("SHA-1");
+        byte[] textBytes = text.getBytes("iso-8859-1");
+        md.update(textBytes, 0, textBytes.length);
+        byte[] sha1hash = md.digest();
+        return convertToHex(sha1hash);
+    }
+}
