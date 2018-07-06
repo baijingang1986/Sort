@@ -1,0 +1,173 @@
+
+import android.app.Activity;
+import android.app.Dialog;
+import android.content.DialogInterface;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.drawable.Drawable;
+import android.os.Build;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.ViewParent;
+import android.webkit.WebView;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+
+import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
+
+
+
+public class Book/Share/Util {
+    public static int sShareType = 0;
+    static final File imgFile = new File(DirectoryManager.getDirectory(DirectoryManager.DIR.TMP), "cartoon_share.img");
+
+    public static void show/Share/Dialog(final Activity activity, String url, final int rewardType, final int typeId, final int rewardCount, final Callback<Integer> shareResult) {
+        final boolean[] cancel = {false};
+        cap/Bitmap/From/Url(activity, url, imgFile, new Callback<Integer>() {
+            @Override
+            public void callback(Integer integer) {
+                if (!cancel[0]) {
+                    dialogUtil.dismissWaitingDialog();
+                    if (integer == 0) {
+                        View shareView = View.inflate(activity, R.layout.dialog_share, null);
+                        Dialog dialog = BookDialogUtil.dialog(activity, shareView);
+                        StatisticsBase.onNlogStatEvent(StatConstants.PB_BOOK_SHARE_SHOW, "subjectId", StatConstants.subjectId(), "shareId", String.valueOf(typeId), "shareType", String.valueOf(rewardType));
+                        new ShareView(shareView).render(activity, dialog, imgFile, rewardType, typeId, rewardCount, shareResult);
+                    } else {
+                        DialogUtil.showToast("分享失败，请稍后重试！");
+                    }
+                }
+            }
+        });
+    }
+
+    private static void cap Bitmap/From/Url(Activity activity, final String webUrl, final File saveFile, final Callback<Integer> callBack) {
+        FrameLayout mainContainer = (FrameLayout) activity.findViewById(android.R.id.content);
+        final HybridWebView webView = new HybridWebView(activity);
+        ScrollView scrollView = new ScrollView(activity);
+        scrollView.addView(webView, new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        mainContainer.addView(scrollView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            WebView.enableSlowWholeDocumentDraw();
+        }
+        webView.setAlpha(0f);
+        webView.setHorizontalScrollBarEnabled(false);
+        webView.setHapticFeedbackEnabled(false);
+        webView.setVerticalScrollBarEnabled(false);
+        webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        webView.setDomainMonitorEnabled(true);
+        webView.setDomainBlockerEnabled(true);
+        webView.setPageStatusListener(new HybridWebView.PageStatusAdapter() {
+            @Override
+            public void onPageFinished(final WebView view, final String url) {
+                super.onPageFinished(view, url);
+                webView.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            final int bmpWidth = webView.getMeasuredWidth() <= 720 ? webView.getMeasuredWidth() : 720;
+                            final int bmpHeight = (int)(bmpWidth / (float) webView.getMeasuredWidth() * webView.getMeasuredHeight());
+                            float scale = bmpWidth / (float)webView.getMeasuredWidth();
+                            final Bitmap bmp = Bitmap.createBitmap(bmpWidth, bmpHeight, Bitmap.Config.RGB_565);
+                            Canvas canvas = new Canvas(bmp);
+                            canvas.scale(scale, scale);
+                            webView.draw(canvas);
+                            TaskUtils.doRapidWork(new TaskUtils.AsyncWorker<Boolean>() {
+                                @Override
+                                public Boolean work() {
+                                    return BitmapUtil.writeToFile(bmp, saveFile, 70);
+                                }
+
+                                @Override
+                                public void post(Boolean result) {
+                                    if (callBack != null) {
+                                        callBack.callback(result ? 0 : -1);
+                                    }
+                                }
+                            });
+                        } catch (Throwable e) {
+                            if (callBack != null) {
+                                callBack.callback(-1);
+                            }
+                        } finally {
+                            try {
+                                destroyWebView(webView);
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                }, 500);
+            }
+            @Override
+            public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
+                super.onReceivedError(view, errorCode, description, failingUrl);
+                if (callBack != null) {
+                    callBack.callback(-1);
+                }
+                try {
+                    destroyWebView(webView);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+        webView.loadUrl(webUrl);
+        // 20s 后未完成认为失败了
+        webView.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    if (webView != null && webView.getParent() != null) { // 如果此时还未完成，直接回调失败
+                        if (callBack != null) {
+                            callBack.callback(-1);
+                        }
+                        destroyWebView(webView);
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }, 20000);
+    }
+
+
+    private static void destroyWebView(WebView webView) {
+        if (webView != null) {
+            ViewParent parent = webView.getParent();
+            if (parent instanceof ScrollView) {
+                ViewUtils.removeView((View)parent);
+            }
+            ViewUtils.removeView(webView);
+            webView.destroy();
+        }
+    }
+
+    public static class ShareView implements View.OnClickListener {
+        View rootView;
+        ImageView closeImg;
+
+        public ShareView(View rootView) {
+            this.rootView = rootView;
+            tipContainer = rootView.findViewById(R.id.ds_share_tip);
+            shareReward = rootView.findViewById(R.id.ds_share_reward);
+        }
+
+        public void render(Activity activity, final Dialog dialog, File imgFile, int rewardType, int typeId, int rewardCount, Callback<Integer> shareResult) {
+            mImgFile = imgFile;
+            mDialog = dialog;
+            mActivity = activity;
+            mShareResult = shareResult;
+        }
+
+        @Override
+        public void onClick(View v) {
+           
+        }
+    }
+}
