@@ -1,0 +1,828 @@
+
+
+import android.app.Activity;
+import android.app.Dialog;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.content.DialogInterface.OnCancelListener;
+import android.content.DialogInterface.OnClickListener;
+import android.os.Handler;
+import android.os.Looper;
+import android.text.Html;
+import android.text.Spanned;
+import android.text.TextUtils;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.ViewGroup.MarginLayoutParams;
+import android.widget.TextView;
+import android.widget.Toast;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
+public class DialogUtil {
+    private static final String TAG = "UIUtil";
+    private boolean mUseSkin = true;
+    private static Toast mToast = null;
+    private AlertDialog mListAlertDialog;
+    private AlertDialog mTextDialog;
+    private AlertDialog mViewDialog;
+    WaitingDialog mWaitingDialog;
+
+    public DialogUtil() {
+    }
+
+    public boolean isUseSkin() {
+        return this.mUseSkin;
+    }
+
+    public void setUseSkin(boolean useSkin) {
+        this.mUseSkin = useSkin;
+    }
+
+    public static void showToast(CharSequence text) {
+        showToast(InitApplication.getApplication(), text, false);
+    }
+
+    public static void showToast(Context context, CharSequence text, boolean longToast) {
+        int duration = longToast?1:0;
+        showToast(context, text, duration);
+    }
+
+    public static void showToast(Context context, int textId, boolean longToast) {
+        if(context != null) {
+            showToast(context, context.getString(textId), longToast);
+        }
+
+    }
+
+    public static void showToast(final Context context, final CharSequence text, final int duration) {
+        if(Looper.myLooper() != Looper.getMainLooper()) {
+            (new Handler(context.getMainLooper())).post(new Runnable() {
+                public void run() {
+                    DialogUtil.toast(context, text, duration, 0, 0, 0);
+                }
+            });
+        } else {
+            toast(context, text, duration, 0, 0, 0);
+        }
+
+    }
+
+    public static void showToast(final Context context, final CharSequence text, final int duration, final int gravity, final int xOffset, final int yOffset) {
+        if(Looper.myLooper() != Looper.getMainLooper()) {
+            (new Handler(context.getMainLooper())).post(new Runnable() {
+                public void run() {
+                    DialogUtil.toast(context, text, duration, gravity, xOffset, yOffset);
+                }
+            });
+        } else {
+            toast(context, text, duration, gravity, xOffset, yOffset);
+        }
+
+    }
+
+    static void toast(Context context, CharSequence text, int duration, int gravity, int xOffset, int yOffset) {
+        if(mToast != null && mToast.getView() != null) {
+            TextView textView = (TextView)mToast.getView().findViewById(id.common_toast_message);
+            if(textView != null) {
+                textView.setText(text);
+                mToast.setDuration(duration);
+                mToast.show();
+                return;
+            }
+        }
+
+        mToast = null;
+
+        Toast toast;
+        try {
+            toast = new Toast(context.getApplicationContext());
+        } catch (Exception var9) {
+            return;
+        } catch (IncompatibleClassChangeError var10) {
+            return;
+        }
+
+        if(gravity != 0) {
+            toast.setGravity(gravity, xOffset, yOffset);
+        }
+
+        View view = View.inflate(context.getApplicationContext(), layout.common_transient_toast, (ViewGroup)null);
+        TextView textView = (TextView)view.findViewById(id.common_toast_message);
+        textView.setText(text);
+        textView.setVisibility(0);
+        toast.setView(view);
+        toast.setDuration(duration);
+        mToast = toast;
+        toast.show();
+    }
+
+    public void showListDialog(Activity context, String title, List<KeyValuePair<Integer, String>> list, DialogUtil.ListItemClickListener listItemListener, OnCancelListener cancelListener) {
+        this.showListDialog(context, title, (List)list, (DialogUtil.ListItemClickListener)listItemListener, (OnCancelListener)cancelListener, (BaseDialogModifier)null);
+    }
+
+    public void showListDialog(Activity context, String title, List<KeyValuePair<Integer, String>> list, final DialogUtil.ListItemClickListener listItemListener, OnCancelListener cancelListener, BaseDialogModifier modifier) {
+        final List<Integer> keyList = new ArrayList();
+        List<String> valList = new ArrayList();
+        Iterator var9 = list.iterator();
+
+        while(var9.hasNext()) {
+            KeyValuePair<Integer, String> item = (KeyValuePair)var9.next();
+            keyList.add(item.getKey());
+            valList.add(item.getValue());
+        }
+
+        this.showListDialog(context, title, (String)null, (String)null, (DialogUtil.ButtonClickListener)null, valList, new DialogUtil.ListItemClickListener() {
+            public void onItemClick(int position) {
+                if(listItemListener != null) {
+                    listItemListener.onItemClick(((Integer)keyList.get(position)).intValue());
+                }
+
+            }
+        }, cancelListener, modifier);
+    }
+
+    public void showListDialogForCallback(Activity context, String title, List<String> list, final DialogUtil.ListItemClickListener listItemListener, OnCancelListener cancelListener) {
+        this.showListDialog(context, title, (String)null, (String)null, (DialogUtil.ButtonClickListener)null, list, new DialogUtil.ListItemClickListener() {
+            public void onItemClick(int position) {
+                if(listItemListener != null) {
+                    listItemListener.onItemClick(position);
+                }
+
+            }
+        }, cancelListener);
+    }
+
+    public void showListDialog(Activity context, String title, String leftButton, String rightButton, DialogUtil.ButtonClickListener buttonListener, List<? extends CharSequence> list, DialogUtil.ListItemClickListener listItemListener, OnCancelListener cancelListener) {
+        this.showListDialog(context, title, leftButton, rightButton, buttonListener, list, listItemListener, cancelListener, (BaseDialogModifier)null);
+    }
+
+    public void showListDialog(final Activity context, final String title, final String leftButton, final String rightButton, final DialogUtil.ButtonClickListener buttonListener, final List<? extends CharSequence> list, final DialogUtil.ListItemClickListener listItemListener, final OnCancelListener cancelListener, final BaseDialogModifier modifier) {
+        if(Looper.myLooper() != Looper.getMainLooper()) {
+            (new Handler(context.getMainLooper())).post(new Runnable() {
+                public void run() {
+                    DialogUtil.this.listDialg(context, title, leftButton, rightButton, buttonListener, list, listItemListener, cancelListener, modifier);
+                }
+            });
+        } else {
+            this.listDialg(context, title, leftButton, rightButton, buttonListener, list, listItemListener, cancelListener, modifier);
+        }
+
+    }
+
+    void listDialg(Activity activity, String title, String leftButton, String rightButton, final DialogUtil.ButtonClickListener buttonListener, List<? extends CharSequence> list, final DialogUtil.ListItemClickListener listItemListener, OnCancelListener cancelListener, BaseDialogModifier modifier) {
+        if(!activity.isFinishing()) {
+            this.dismissListDialog();
+            Builder builder = new Builder(activity);
+            builder.setItems((CharSequence[])list.toArray(new CharSequence[list.size()]), new OnClickListener() {
+                public void onClick(DialogInterface dialog, int which) {
+                    if(listItemListener != null) {
+                        listItemListener.onItemClick(which);
+                    }
+
+                }
+            });
+            OnClickListener dialogListener = new OnClickListener() {
+                public void onClick(DialogInterface dialog, int which) {
+                    if(which == -1) {
+                        if(buttonListener != null) {
+                            buttonListener.OnLeftButtonClick();
+                        }
+                    } else if(which == -2 && buttonListener != null) {
+                        buttonListener.OnRightButtonClick();
+                    }
+
+                }
+            };
+            builder.setTitle(title);
+            builder.setPositiveButton(leftButton, dialogListener);
+            builder.setNegativeButton(rightButton, dialogListener);
+            builder.setOnCancelListener(cancelListener);
+            if(modifier == null) {
+                builder.setModifier((new BaseDialogModifier()).setUseSkin(this.mUseSkin));
+            } else {
+                builder.setModifier(modifier.setUseSkin(this.mUseSkin));
+            }
+
+            this.mListAlertDialog = builder.show();
+        }
+    }
+
+    public void showListDialog(Activity context, String leftButton, String rightButton, DialogUtil.ButtonClickListener buttonListener, List<? extends CharSequence> list, DialogUtil.ListItemClickListener listItemListener) {
+        this.showListDialog(context, (String)null, leftButton, rightButton, buttonListener, list, listItemListener, (OnCancelListener)null);
+    }
+
+    public void dismissListDialog() {
+        try {
+            if(this.mListAlertDialog != null && this.mListAlertDialog.isShowing()) {
+                this.mListAlertDialog.dismiss();
+            }
+
+            this.mListAlertDialog = null;
+        } catch (Exception var2) {
+            ;
+        }
+
+    }
+
+    public AlertDialog createListDialog(Context context, String title, String leftButton, String rightButton, DialogUtil.ButtonClickListener buttonListener, List<String> list, DialogUtil.ListItemClickListener listItemListener) {
+        return this.createListDialog(context, title, leftButton, rightButton, buttonListener, list, listItemListener, (OnCancelListener)null);
+    }
+
+    public AlertDialog createListDialog(Context context, String title, String leftButton, String rightButton, final DialogUtil.ButtonClickListener buttonListener, List<String> list, final DialogUtil.ListItemClickListener listItemListener, final OnCancelListener mOnCancelListener) {
+        Builder builder = new Builder(context);
+        builder.setItems((CharSequence[])list.toArray(new CharSequence[list.size()]), new OnClickListener() {
+            public void onClick(DialogInterface dialog, int which) {
+                if(listItemListener != null) {
+                    listItemListener.onItemClick(which);
+                }
+
+            }
+        });
+        OnClickListener dialogListener = new OnClickListener() {
+            public void onClick(DialogInterface dialog, int which) {
+                if(which == -1) {
+                    if(buttonListener != null) {
+                        buttonListener.OnLeftButtonClick();
+                    }
+                } else if(which == -2 && buttonListener != null) {
+                    buttonListener.OnRightButtonClick();
+                }
+
+            }
+        };
+        builder.setTitle(title);
+        builder.setPositiveButton(leftButton, dialogListener);
+        builder.setNegativeButton(rightButton, dialogListener);
+        if(mOnCancelListener != null) {
+            builder.setOnCancelListener(mOnCancelListener);
+            builder.getBaseDialogModifier().setmCustomRightIconClickListener(new android.view.View.OnClickListener() {
+                public void onClick(View v) {
+                    if(mOnCancelListener != null) {
+                        mOnCancelListener.onCancel((DialogInterface)null);
+                    }
+
+                }
+            });
+        }
+
+        AlertDialog dialog = builder.show();
+        return dialog;
+    }
+
+    public void showDialog(Activity context, String leftButton, String rightButton, DialogUtil.ButtonClickListener buttonListener, CharSequence message) {
+        this.showDialog(context, (String)null, leftButton, rightButton, buttonListener, message);
+    }
+
+    public void showDialog(Activity context, String title, String leftButton, String rightButton, DialogUtil.ButtonClickListener buttonListener, CharSequence message) {
+        this.showDialog(context, title, leftButton, rightButton, buttonListener, message, true, true, (OnCancelListener)null);
+    }
+
+    public void showDialog(Activity context, String title, String leftButton, String rightButton, DialogUtil.ButtonClickListener buttonListener, CharSequence message, boolean cancelable, boolean isCanceledOnTouchOutside, OnCancelListener onCancelListener) {
+        this.showDialog(context, title, leftButton, rightButton, buttonListener, message, cancelable, isCanceledOnTouchOutside, onCancelListener, (BaseDialogModifier)null);
+    }
+
+    public void showDialog(final Activity context, final String title, final String leftButton, final String rightButton, final DialogUtil.ButtonClickListener buttonListener, final CharSequence message, final boolean cancelable, final boolean isCanceledOnTouchOutside, final OnCancelListener onCancelListener, final BaseDialogModifier modifier) {
+        if(Looper.myLooper() != Looper.getMainLooper()) {
+            (new Handler(context.getMainLooper())).post(new Runnable() {
+                public void run() {
+                    DialogUtil.this.dialog(context, title, leftButton, rightButton, buttonListener, message, cancelable, isCanceledOnTouchOutside, onCancelListener, modifier);
+                }
+            });
+        } else {
+            this.dialog(context, title, leftButton, rightButton, buttonListener, message, cancelable, isCanceledOnTouchOutside, onCancelListener, modifier);
+        }
+
+    }
+
+    public void showDialog(final Activity context, final String title, final String leftButton, final String rightButton, final DialogUtil.ButtonClickListener buttonListener, final CharSequence message, final boolean cancelable, final boolean isCanceledOnTouchOutside, final OnCancelListener onCancelListener, final BaseDialogModifier modifier, final boolean isDismissWhenClickLeftButton, final boolean isDismissWhenClickRightButton) {
+        if(Looper.myLooper() != Looper.getMainLooper()) {
+            (new Handler(context.getMainLooper())).post(new Runnable() {
+                public void run() {
+                    DialogUtil.this.dialog(context, title, leftButton, rightButton, buttonListener, message, cancelable, isCanceledOnTouchOutside, onCancelListener, modifier, isDismissWhenClickLeftButton, isDismissWhenClickRightButton);
+                }
+            });
+        } else {
+            this.dialog(context, title, leftButton, rightButton, buttonListener, message, cancelable, isCanceledOnTouchOutside, onCancelListener, modifier, isDismissWhenClickLeftButton, isDismissWhenClickRightButton);
+        }
+
+    }
+
+    public void showModiferDialog(final Activity context, final String title, final String leftButton, final String rightButton, final DialogUtil.ButtonClickListener buttonListener, final CharSequence message, final boolean cancelable, final boolean isCanceledOnTouchOutside, final OnCancelListener onCancelListener, final BaseDialogModifier modifier) {
+        if(Looper.myLooper() != Looper.getMainLooper()) {
+            (new Handler(context.getMainLooper())).post(new Runnable() {
+                public void run() {
+                    DialogUtil.this.dialog(context, title, leftButton, rightButton, buttonListener, message, cancelable, isCanceledOnTouchOutside, onCancelListener, modifier);
+                }
+            });
+        } else {
+            this.dialog(context, title, leftButton, rightButton, buttonListener, message, cancelable, isCanceledOnTouchOutside, onCancelListener, modifier);
+        }
+
+    }
+
+    public void showSmallDialog(final Activity context, final String title, final String leftButton, final String rightButton, final DialogUtil.ButtonClickListener buttonListener, final CharSequence message, final boolean cancelable, final boolean isCanceledOnTouchOutside, final OnCancelListener onCancelListener) {
+        if(Looper.myLooper() != Looper.getMainLooper()) {
+            (new Handler(context.getMainLooper())).post(new Runnable() {
+                public void run() {
+                    DialogUtil.this.dialog(context, title, leftButton, rightButton, buttonListener, message, cancelable, isCanceledOnTouchOutside, onCancelListener, (int)((double)ScreenUtil.getScreenWidth() / 1.2D), -2);
+                }
+            });
+        } else {
+            this.dialog(context, title, leftButton, rightButton, buttonListener, message, cancelable, isCanceledOnTouchOutside, onCancelListener, (int)((double)ScreenUtil.getScreenWidth() / 1.2D), -2);
+        }
+
+    }
+
+    public void showSmallDialog(Activity context, String title, String leftButton, String rightButton, DialogUtil.ButtonClickListener buttonListener, CharSequence message) {
+        this.showSmallDialog(context, title, leftButton, rightButton, buttonListener, message, true, true, (OnCancelListener)null);
+    }
+
+    public void showSmallDialog(Activity context, String leftButton, String rightButton, DialogUtil.ButtonClickListener buttonListener, CharSequence message) {
+        this.showSmallDialog(context, (String)null, leftButton, rightButton, buttonListener, message);
+    }
+
+    public void showOrientDialog(Activity context, String leftButton, String rightButton, DialogUtil.ButtonClickListener buttonListener, int message) {
+        this.showOrientDialog(context, leftButton, rightButton, buttonListener, context.getString(message));
+    }
+
+    public void showOrientDialog(Activity context, String leftButton, String rightButton, DialogUtil.ButtonClickListener buttonListener, CharSequence message) {
+        this.showOrientDialog(context, (String)null, leftButton, rightButton, buttonListener, message, true, false, (OnCancelListener)null);
+    }
+
+    public void showOrientDialog(Activity context, String title, String leftButton, String rightButton, DialogUtil.ButtonClickListener buttonListener, CharSequence message) {
+        this.showOrientDialog(context, title, leftButton, rightButton, buttonListener, message, true, false, (OnCancelListener)null);
+    }
+
+    public void showOrientDialog(final Activity context, final String title, final String leftButton, final String rightButton, final DialogUtil.ButtonClickListener buttonListener, final CharSequence message, final boolean cancelable, final boolean isCanceledOnTouchOutside, final OnCancelListener onCancelListener) {
+        if(Looper.myLooper() != Looper.getMainLooper()) {
+            (new Handler(context.getMainLooper())).post(new Runnable() {
+                public void run() {
+                    if(context.getRequestedOrientation() == 0) {
+                        DialogUtil.this.dialog(context, title, leftButton, rightButton, buttonListener, message, cancelable, isCanceledOnTouchOutside, onCancelListener, ScreenUtil.getScreenWidth() * 2 / 3, -2);
+                    } else {
+                        DialogUtil.this.dialog(context, title, leftButton, rightButton, buttonListener, message, cancelable, isCanceledOnTouchOutside, onCancelListener, (BaseDialogModifier)null);
+                    }
+
+                }
+            });
+        } else if(context.getRequestedOrientation() == 0) {
+            this.dialog(context, title, leftButton, rightButton, buttonListener, message, cancelable, isCanceledOnTouchOutside, onCancelListener, ScreenUtil.getScreenWidth() * 2 / 3, -2);
+        } else {
+            this.dialog(context, title, leftButton, rightButton, buttonListener, message, cancelable, isCanceledOnTouchOutside, onCancelListener, (BaseDialogModifier)null);
+        }
+
+    }
+
+    void dialog(Activity activity, String title, String leftButton, String rightButton, final DialogUtil.ButtonClickListener buttonListener, CharSequence message, boolean cancelable, boolean isCanceledOnTouchOutside, OnCancelListener onCancelListener, BaseDialogModifier modifier) {
+        if(!activity.isFinishing()) {
+            this.dismissDialog();
+            Builder builder = new Builder(activity);
+            builder.setTitle(title);
+            builder.setMessage(message);
+            builder.setOnCancelListener(onCancelListener);
+            if(modifier == null) {
+                builder.setModifier((new BaseDialogModifier()).setUseSkin(this.mUseSkin));
+            } else {
+                builder.setModifier(modifier.setUseSkin(this.mUseSkin));
+            }
+
+            OnClickListener dialogListener = new OnClickListener() {
+                public void onClick(DialogInterface dialog, int which) {
+                    if(which == -1) {
+                        if(buttonListener != null) {
+                            buttonListener.OnLeftButtonClick();
+                        }
+                    } else if(which == -2 && buttonListener != null) {
+                        buttonListener.OnRightButtonClick();
+                    }
+
+                }
+            };
+            builder.setPositiveButton(leftButton, dialogListener);
+            builder.setNegativeButton(rightButton, dialogListener);
+            this.mTextDialog = builder.show();
+            this.mTextDialog.setCancelable(cancelable);
+            this.mTextDialog.setCanceledOnTouchOutside(isCanceledOnTouchOutside);
+        }
+    }
+
+    void dialog(Activity activity, String title, String leftButton, String rightButton, final DialogUtil.ButtonClickListener buttonListener, CharSequence message, boolean cancelable, boolean isCanceledOnTouchOutside, OnCancelListener onCancelListener, BaseDialogModifier modifier, boolean isDismissWhenClickLeftButton, boolean isDismissWhenClickRightButton) {
+        if(!activity.isFinishing()) {
+            this.dismissDialog();
+            Builder builder = new Builder(activity);
+            builder.setTitle(title);
+            builder.setMessage(message);
+            builder.setOnCancelListener(onCancelListener);
+            if(modifier == null) {
+                builder.setModifier((new BaseDialogModifier()).setUseSkin(this.mUseSkin));
+            } else {
+                builder.setModifier(modifier.setUseSkin(this.mUseSkin));
+            }
+
+            OnClickListener dialogListener = new OnClickListener() {
+                public void onClick(DialogInterface dialog, int which) {
+                    if(which == -1) {
+                        if(buttonListener != null) {
+                            buttonListener.OnLeftButtonClick();
+                        }
+                    } else if(which == -2 && buttonListener != null) {
+                        buttonListener.OnRightButtonClick();
+                    }
+
+                }
+            };
+            builder.setPositiveButton(leftButton, dialogListener);
+            builder.setNegativeButton(rightButton, dialogListener);
+            this.mTextDialog = builder.show();
+            this.mTextDialog.setLeftButtonAbleDismissDialog(isDismissWhenClickLeftButton);
+            this.mTextDialog.setRightButtonAbleDismissDialog(isDismissWhenClickRightButton);
+            this.mTextDialog.setCancelable(cancelable);
+            this.mTextDialog.setCanceledOnTouchOutside(isCanceledOnTouchOutside);
+        }
+    }
+
+    void dialog(Activity activity, String title, String leftButton, String rightButton, final DialogUtil.ButtonClickListener buttonListener, CharSequence message, boolean cancelable, boolean isCanceledOnTouchOutside, OnCancelListener onCancelListener, int width, int height) {
+        if(!activity.isFinishing()) {
+            this.dismissDialog();
+            Builder builder = new Builder(activity);
+            builder.setTitle(title);
+            builder.setMessage(message);
+            builder.setModifier((new BaseDialogModifier()).setUseSkin(this.mUseSkin));
+            builder.setOnCancelListener(onCancelListener);
+            OnClickListener dialogListener = new OnClickListener() {
+                public void onClick(DialogInterface dialog, int which) {
+                    if(which == -1) {
+                        if(buttonListener != null) {
+                            buttonListener.OnLeftButtonClick();
+                        }
+                    } else if(which == -2 && buttonListener != null) {
+                        buttonListener.OnRightButtonClick();
+                    }
+
+                }
+            };
+            builder.setPositiveButton(leftButton, dialogListener);
+            builder.setNegativeButton(rightButton, dialogListener);
+            this.mTextDialog = builder.show(width, height);
+            this.mTextDialog.setCancelable(cancelable);
+            this.mTextDialog.setCanceledOnTouchOutside(isCanceledOnTouchOutside);
+        }
+    }
+
+    public void dismissDialog() {
+        try {
+            if(this.mTextDialog != null && this.mTextDialog.isShowing()) {
+                this.mTextDialog.dismiss();
+            }
+
+            this.mTextDialog = null;
+        } catch (Exception var2) {
+            ;
+        }
+
+    }
+
+    public AlertDialog createDialog(Context context, String title, String leftButton, String rightButton, final DialogUtil.ButtonClickListener buttonListener, String message) {
+        Builder builder = new Builder(context);
+        builder.setTitle(title);
+        builder.setMessage(message);
+        OnClickListener dialogListener = new OnClickListener() {
+            public void onClick(DialogInterface dialog, int which) {
+                if(which == -1) {
+                    if(buttonListener != null) {
+                        buttonListener.OnLeftButtonClick();
+                    }
+                } else if(which == -2 && buttonListener != null) {
+                    buttonListener.OnRightButtonClick();
+                }
+
+            }
+        };
+        builder.setPositiveButton(leftButton, dialogListener);
+        builder.setNegativeButton(rightButton, dialogListener);
+        AlertDialog dialog = builder.show();
+        return dialog;
+    }
+
+    public void showViewDialog(Activity context, CharSequence title, String leftButton, String rightButton, DialogUtil.ButtonClickListener buttonListener, View view) {
+        this.showViewDialog(context, title, leftButton, rightButton, buttonListener, view, true, true, (OnCancelListener)null);
+    }
+
+    public void showViewDialog(Activity context, CharSequence title, String leftButton, String rightButton, DialogUtil.ButtonClickListener buttonListener, View view, boolean isDismissWhenClickLeftButton, boolean isDismissWhenClickRightButton) {
+        this.showViewDialog(context, title, leftButton, rightButton, buttonListener, view, true, true, (OnCancelListener)null, -1, false, isDismissWhenClickLeftButton, isDismissWhenClickRightButton, (BaseDialogModifier)null);
+    }
+
+    public void showViewDialog(Activity context, String leftButton, String rightButton, DialogUtil.ButtonClickListener buttonListener, View view) {
+        this.showViewDialog(context, (CharSequence)null, leftButton, rightButton, buttonListener, view);
+    }
+
+    public void showViewDialog(Activity context, CharSequence title, CharSequence leftButton, CharSequence rightButton, DialogUtil.ButtonClickListener buttonListener, View view, boolean cancelable, boolean isCanceledOnTouchOutside, OnCancelListener cancelListener, int backgroundColor, boolean isFrameTransparent) {
+        this.showViewDialog(context, title, leftButton, rightButton, buttonListener, view, cancelable, isCanceledOnTouchOutside, cancelListener, backgroundColor, isFrameTransparent, (BaseDialogModifier)null);
+    }
+
+    public void showRawViewDialog(Activity context, View view, boolean cancelable, boolean isCanceledOnTouchOutside, OnCancelListener cancelListener, int gravity) {
+        this.showViewDialog(context, (CharSequence)null, (CharSequence)null, (CharSequence)null, (DialogUtil.ButtonClickListener)null, view, cancelable, isCanceledOnTouchOutside, cancelListener, 0, false, (new BaseDialogModifier() {
+            protected void customModify(AlertController controller, View contentView) {
+                super.customModify(controller, contentView);
+                View root = contentView.findViewById(id.iknow_alert_dialog_panel_wrapper);
+                MarginLayoutParams params = (MarginLayoutParams)root.getLayoutParams();
+                params.leftMargin = params.rightMargin = 0;
+                View contentContainer = contentView.findViewById(id.iknow_alert_dialog_custom_content);
+                contentContainer.setPadding(0, 0, 0, 0);
+            }
+        }).setGravity(gravity));
+    }
+
+    public void showViewDialog(Activity context, CharSequence title, CharSequence leftButton, CharSequence rightButton, DialogUtil.ButtonClickListener buttonListener, View view, boolean cancelable, boolean isCanceledOnTouchOutside, OnCancelListener cancelListener, int backgroundColor, boolean isFrameTransparent, BaseDialogModifier modifier) {
+        this.showViewDialog(context, title, leftButton, rightButton, buttonListener, view, cancelable, isCanceledOnTouchOutside, cancelListener, backgroundColor, isFrameTransparent, true, true, modifier);
+    }
+
+    public void showViewDialog(final Activity context, final CharSequence title, final CharSequence leftButton, final CharSequence rightButton, final DialogUtil.ButtonClickListener buttonListener, final View view, final boolean cancelable, final boolean isCanceledOnTouchOutside, final OnCancelListener cancelListener, final int backgroundColor, final boolean isFrameTransparent, final boolean isDismissWhenClickLeftButton, final boolean isDismissWhenClickRightButton, final BaseDialogModifier modifier) {
+        if(Looper.myLooper() != Looper.getMainLooper()) {
+            (new Handler(context.getMainLooper())).post(new Runnable() {
+                public void run() {
+                    DialogUtil.this.viewDialog(context, title, leftButton, rightButton, buttonListener, view, cancelable, isCanceledOnTouchOutside, cancelListener, backgroundColor, isFrameTransparent, isDismissWhenClickLeftButton, isDismissWhenClickRightButton, modifier);
+                }
+            });
+        } else {
+            this.viewDialog(context, title, leftButton, rightButton, buttonListener, view, cancelable, isCanceledOnTouchOutside, cancelListener, backgroundColor, isFrameTransparent, isDismissWhenClickLeftButton, isDismissWhenClickRightButton, modifier);
+        }
+
+    }
+
+    public void showLandViewDialog(final Activity context, final CharSequence title, final CharSequence leftButton, final CharSequence rightButton, final DialogUtil.ButtonClickListener buttonListener, final View view, final boolean cancelable, final boolean isCanceledOnTouchOutside, final OnCancelListener cancelListener, final BaseDialogModifier modifier) {
+        if(Looper.myLooper() != Looper.getMainLooper()) {
+            (new Handler(context.getMainLooper())).post(new Runnable() {
+                public void run() {
+                    DialogUtil.this.landViewDialog(context, title, leftButton, rightButton, buttonListener, view, cancelable, isCanceledOnTouchOutside, cancelListener, modifier);
+                }
+            });
+        } else {
+            this.landViewDialog(context, title, leftButton, rightButton, buttonListener, view, cancelable, isCanceledOnTouchOutside, cancelListener, modifier);
+        }
+
+    }
+
+    void landViewDialog(Activity activity, CharSequence title, CharSequence leftButton, CharSequence rightButton, final DialogUtil.ButtonClickListener buttonListener, View view, boolean cancelable, boolean isCanceledOnTouchOutside, OnCancelListener cancelListener, BaseDialogModifier modifier) {
+        if(!activity.isFinishing()) {
+            this.dismissViewDialog();
+            Builder builder = new Builder(activity);
+            if(!TextUtils.isEmpty(title)) {
+                builder.setTitle(title);
+            }
+
+            builder.setView(view);
+            OnClickListener dialogListener = new OnClickListener() {
+                public void onClick(DialogInterface dialog, int which) {
+                    if(which == -1) {
+                        if(buttonListener != null) {
+                            buttonListener.OnLeftButtonClick();
+                        }
+                    } else if(which == -2 && buttonListener != null) {
+                        buttonListener.OnRightButtonClick();
+                    }
+
+                }
+            };
+            builder.setPositiveButton(leftButton, dialogListener);
+            builder.setNegativeButton(rightButton, dialogListener);
+            if(modifier == null) {
+                builder.setModifier((new BaseDialogModifier()).setUseSkin(this.mUseSkin));
+            } else {
+                builder.setModifier(modifier.setUseSkin(this.mUseSkin));
+            }
+
+            this.mViewDialog = builder.show(ScreenUtil.getScreenWidth() * 3 / 5, -2);
+            this.mViewDialog.setCancelable(cancelable);
+            this.mViewDialog.setOnCancelListener(cancelListener);
+            this.mViewDialog.setCanceledOnTouchOutside(isCanceledOnTouchOutside);
+        }
+    }
+
+    public void showViewDialog(Activity context, CharSequence title, CharSequence leftButton, CharSequence rightButton, DialogUtil.ButtonClickListener buttonListener, View view, boolean cancelable, boolean isCanceledOnTouchOutside, OnCancelListener cancelListener) {
+        this.showViewDialog(context, title, leftButton, rightButton, buttonListener, view, cancelable, isCanceledOnTouchOutside, cancelListener, -1, false);
+    }
+
+    private void viewDialog(Activity activity, CharSequence title, String leftButton, String rightButton, DialogUtil.ButtonClickListener buttonListener, View view, boolean cancelable, boolean isCanceledOnTouchOutside, OnCancelListener cancelListener, int backgroundColor, boolean isFrameTransparent) {
+        this.viewDialog(activity, title, leftButton, rightButton, buttonListener, view, cancelable, isCanceledOnTouchOutside, cancelListener, backgroundColor, isFrameTransparent, true, true, (BaseDialogModifier)null);
+    }
+
+    void viewDialog(Activity activity, CharSequence title, CharSequence leftButton, CharSequence rightButton, final DialogUtil.ButtonClickListener buttonListener, View view, boolean cancelable, boolean isCanceledOnTouchOutside, OnCancelListener cancelListener, int backgroundColor, boolean isFrameTransparent, boolean isDismissWhenClickLeftButton, boolean isDismissWhenClickRightButton, BaseDialogModifier modifier) {
+        if(!activity.isFinishing()) {
+            this.dismissViewDialog();
+            Builder builder = new Builder(activity);
+            if(!TextUtils.isEmpty(title)) {
+                builder.setTitle(title);
+            }
+
+            builder.setView(view);
+            OnClickListener dialogListener = new OnClickListener() {
+                public void onClick(DialogInterface dialog, int which) {
+                    if(which == -1) {
+                        if(buttonListener != null) {
+                            buttonListener.OnLeftButtonClick();
+                        }
+                    } else if(which == -2 && buttonListener != null) {
+                        buttonListener.OnRightButtonClick();
+                    }
+
+                }
+            };
+            builder.setPositiveButton(leftButton, dialogListener);
+            builder.setNegativeButton(rightButton, dialogListener);
+            if(modifier == null) {
+                builder.setModifier((new BaseDialogModifier()).setUseSkin(this.mUseSkin));
+            } else {
+                builder.setModifier(modifier.setUseSkin(this.mUseSkin));
+            }
+
+            if(isFrameTransparent) {
+                this.mViewDialog = builder.show(style.common_alert_dialog_theme_transparent);
+            } else {
+                this.mViewDialog = builder.show();
+            }
+
+            this.mViewDialog.setCancelable(cancelable);
+            this.mViewDialog.setOnCancelListener(cancelListener);
+            this.mViewDialog.setCanceledOnTouchOutside(isCanceledOnTouchOutside);
+            this.mViewDialog.setLeftButtonAbleDismissDialog(isDismissWhenClickLeftButton);
+            this.mViewDialog.setRightButtonAbleDismissDialog(isDismissWhenClickRightButton);
+            if(backgroundColor >= 0) {
+                this.mViewDialog.setBackgroudColor(backgroundColor);
+            }
+
+        }
+    }
+
+    public void dismissViewDialog() {
+        if(this.mViewDialog != null && this.mViewDialog.isShowing()) {
+            this.mViewDialog.dismiss();
+        }
+
+        this.mViewDialog = null;
+    }
+
+    public Dialog getViewDialog() {
+        return this.mViewDialog;
+    }
+
+    public boolean isShowViewDialog() {
+        return this.mViewDialog == null?false:this.mViewDialog.isShowing();
+    }
+
+    public boolean isShowDialog() {
+        return this.mTextDialog == null?false:this.mTextDialog.isShowing();
+    }
+
+    public AlertDialog createViewDialog(Activity context, String title, String leftButton, String rightButton, final DialogUtil.ButtonClickListener buttonListener, View view) {
+        Builder builder = new Builder(context);
+        if(!TextUtils.isEmpty(title)) {
+            builder.setTitle(title);
+        }
+
+        builder.setView(view);
+        OnClickListener dialogListener = new OnClickListener() {
+            public void onClick(DialogInterface dialog, int which) {
+                if(which == -1) {
+                    if(buttonListener != null) {
+                        buttonListener.OnLeftButtonClick();
+                    }
+                } else if(which == -2 && buttonListener != null) {
+                    buttonListener.OnRightButtonClick();
+                }
+
+            }
+        };
+        builder.setPositiveButton(leftButton, dialogListener);
+        builder.setNegativeButton(rightButton, dialogListener);
+        AlertDialog dialog = builder.show();
+        return dialog;
+    }
+
+    public void showWaitingDialog(final Activity context, final CharSequence title, final CharSequence message, final boolean cancelable, final boolean isCanceledOnTouchOutside, final OnCancelListener onCancelListener) {
+        if(Looper.myLooper() != Looper.getMainLooper()) {
+            (new Handler(context.getMainLooper())).post(new Runnable() {
+                public void run() {
+                    DialogUtil.this.waitingDialog(context, title, message, cancelable, isCanceledOnTouchOutside, onCancelListener);
+                }
+            });
+        } else {
+            this.waitingDialog(context, title, message, cancelable, isCanceledOnTouchOutside, onCancelListener);
+        }
+
+    }
+
+    void waitingDialog(Activity activity, CharSequence title, CharSequence message, boolean cancelable, boolean isCanceledOnTouchOutside, OnCancelListener onCancelListener) {
+        if(!activity.isFinishing()) {
+            this.dismissWaitingDialog();
+            this.mWaitingDialog = WaitingDialog.show(activity, title, message);
+            this.mWaitingDialog.setCancelable(cancelable);
+            this.mWaitingDialog.setOnCancelListener(onCancelListener);
+            this.mWaitingDialog.setCanceledOnTouchOutside(isCanceledOnTouchOutside);
+        }
+    }
+
+    public void showWaitingDialog(Activity context, CharSequence message) {
+        this.showWaitingDialog(context, (CharSequence)null, message, false, false, (OnCancelListener)null);
+    }
+
+    public void showWaitingDialog(Activity context, CharSequence message, boolean cancelable) {
+        this.showWaitingDialog(context, (CharSequence)null, message, cancelable, false, (OnCancelListener)null);
+    }
+
+    public void showWaitingDialog(Activity context, CharSequence message, OnCancelListener cancelListener) {
+        this.showWaitingDialog(context, (CharSequence)null, message, true, false, cancelListener);
+    }
+
+    public void showWaitingDialog(Activity context, int messageId, boolean cancelable) {
+        this.showWaitingDialog(context, (CharSequence)null, context.getString(messageId), cancelable, false, (OnCancelListener)null);
+    }
+
+    public void showWaitingDialog(Activity context, int messageId, OnCancelListener cancelListener) {
+        this.showWaitingDialog(context, (CharSequence)null, context.getString(messageId), true, false, cancelListener);
+    }
+
+    public void showWaitingDialog(Activity context, int messageId) {
+        this.showWaitingDialog(context, (CharSequence)null, context.getString(messageId), false, false, (OnCancelListener)null);
+    }
+
+    public boolean isShowWaitingDialog() {
+        return this.mWaitingDialog == null?false:this.mWaitingDialog.isShowing();
+    }
+
+    public void dismissWaitingDialog() {
+        try {
+            if(this.mWaitingDialog != null && this.mWaitingDialog.isShowing()) {
+                this.mWaitingDialog.dismiss();
+            }
+
+            this.mWaitingDialog = null;
+        } catch (Exception var2) {
+            var2.printStackTrace();
+        }
+
+    }
+
+    public void dismissWaitingDialogDelay(long delay) {
+        if(this.mWaitingDialog != null) {
+            try {
+                Handler handler = new Handler();
+                handler.postDelayed(new Runnable() {
+                    public void run() {
+                        DialogUtil.this.mWaitingDialog.dismiss();
+                    }
+                }, delay);
+            } catch (Exception var4) {
+                var4.printStackTrace();
+            }
+        }
+
+        this.mWaitingDialog = null;
+    }
+
+    public WaitingDialog createWaitingDialog(Activity context, CharSequence title, CharSequence message, boolean cancelable, boolean isCanceledOnTouchOutside) {
+        WaitingDialog dialog = WaitingDialog.show(context, title, message);
+        dialog.setCancelable(cancelable);
+        dialog.setCanceledOnTouchOutside(isCanceledOnTouchOutside);
+        return dialog;
+    }
+
+    public static void showColorToast(Context context, String preStr, String colorStr, String sufStr) {
+        String ToastStr = preStr + "<font size='15' color='#fb7f2d'>" + colorStr + "</font>" + sufStr;
+        Spanned spanned = Html.fromHtml(ToastStr);
+        showToast(context, spanned, false);
+    }
+
+    public static void showColorToast(Context context, String comment, int score) {
+        if(!TextUtils.isEmpty(comment)) {
+            if(comment.contains("[]")) {
+                int index = comment.indexOf("[]");
+                String preStr = comment.substring(0, index);
+                String colorStr = score > 0?"+" + score:"-" + score;
+                String sufStr;
+                if(index + 2 >= comment.length()) {
+                    sufStr = "";
+                } else {
+                    sufStr = comment.substring(index + 2);
+                }
+
+                showColorToast(context, preStr, colorStr, sufStr);
+            } else {
+                showToast(context, comment, false);
+            }
+
+        }
+    }
+
+    public interface ListItemClickListener {
+        void onItemClick(int var1);
+    }
+
+    public interface ButtonClickListener {
+        void OnLeftButtonClick();
+
+        void OnRightButtonClick();
+    }
+}
