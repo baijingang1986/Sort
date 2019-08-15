@@ -1,0 +1,226 @@
+package com.baidu.homework.common.photo.core;
+
+import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.Matrix;
+import android.graphics.Path;
+import android.graphics.Point;
+import android.graphics.Rect;
+import android.graphics.RectF;
+import android.graphics.Region;
+import android.util.AttributeSet;
+import android.view.MotionEvent;
+import android.view.View;
+
+import com.baidu.homework.common.camera.CameraStatistic;
+import com.baidu.homework.common.statistics.StatisticsBase;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * @author zyb
+ */
+
+public class ImageDecorContainer extends View {
+
+    private List<Bubble> mBubbles = new ArrayList<>();
+
+    protected final float[] mMatrixValues = new float[9];
+    private Matrix mDrawableMatrix;
+    private Rect mDrawableBound;
+    private float mCurrentScale;
+    private DrawHelper mDrawHelper;
+
+    private MotionEvent mEvDown;
+    private MotionEvent mEvUp;
+    private MotionEvent mEvDownPointer;
+    private boolean mIsZoomDetected = false;
+
+    private float lastX, lastY;
+
+    public interface IClick {
+        void bubbleClick(int index);
+    }
+
+    private IClick iClick;
+
+    public void setClick(IClick click) {
+        iClick = click;
+    }
+
+    public ImageDecorContainer(Context context) {
+        this(context, null);
+    }
+
+    public ImageDecorContainer(Context context, AttributeSet attrs) {
+        this(context, attrs, 0);
+    }
+
+    public ImageDecorContainer(Context context, AttributeSet attrs, int defStyleAttr) {
+        super(context, attrs, defStyleAttr);
+        init();
+    }
+
+    private void init() {
+        setWillNotDraw(false);
+        setLayerType(LAYER_TYPE_SOFTWARE, null);
+        mDrawHelper = new DrawHelper(getContext(), this);
+        mDrawHelper.setBubbleSizeChange(false);
+    }
+
+    @Override
+    protected void dispatchDraw(Canvas canvas) {
+        super.dispatchDraw(canvas);
+        if (mDrawableMatrix == null) {
+            mDrawHelper.drawAll(canvas, mDrawableBound);
+        } else {
+            int saveCount = canvas.getSaveCount();
+            canvas.save();
+            if (mDrawableMatrix != null) {
+                canvas.concat(mDrawableMatrix);
+                mDrawHelper.setScale(mCurrentScale);
+            }
+            mDrawHelper.drawAll(canvas, mDrawableBound);
+            canvas.restoreToCount(saveCount);
+        }
+    }
+
+    public void setMatrixAndBounds(Matrix matrix, Rect bound, int imgWidth, int avgHeight) {
+//        if (matrix != null && matrix.isIdentity()) {
+//            matrix = null;
+//        }
+        mDrawHelper.setAvgHeight(avgHeight);
+        mDrawableMatrix = matrix;
+        mDrawableBound = bound;
+        if (bound != null && imgWidth > 0) {
+            mCurrentScale = bound.width() / (float) imgWidth;
+        }
+        invalidate();
+    }
+
+    public Matrix getDrawableMatrix() {
+        return mDrawableMatrix;
+    }
+
+    public void setImgScale(int imgScale) {
+        mDrawHelper.setImgScale(imgScale);
+    }
+
+    public void setBubbles(List<Bubble> list) {
+        if (list != null) {
+            mBubbles.clear();
+            mBubbles.addAll(list);
+            mDrawHelper.setBubbles(list);
+        }
+    }
+
+    /**
+     * 处理bubble点击事件
+     *
+     * @param event
+     * @return
+     */
+    public boolean handleClick(MotionEvent event) {
+        int action = event.getActionMasked();
+        switch (action) {
+            case MotionEvent.ACTION_DOWN:
+                mEvDown = MotionEvent.obtain(event);
+                lastX = mEvDown.getX();
+                lastY = mEvDown.getY();
+                break;
+            case MotionEvent.ACTION_MOVE:
+                break;
+            default:
+                if (action == MotionEvent.ACTION_POINTER_DOWN) {
+                    mIsZoomDetected = true;
+
+                } else if (action == MotionEvent.ACTION_UP) {
+                    mEvUp = MotionEvent.obtain(event);
+                    float X = mEvUp.getX();
+                    float Y = mEvUp.getY();
+                    boolean hasNotMoved = Math.abs(lastX - X) < 4 && Math.abs(lastY - Y) < 4;
+                    if (!mIsZoomDetected && hasNotMoved && mDrawableMatrix != null) {
+                        float x = (X - getTranslationX(mDrawableMatrix)) / getScaleX(mDrawableMatrix);
+                        float y = (Y - getTranslationY(mDrawableMatrix)) / getScaleX(mDrawableMatrix);
+                        Bubble selectedBubble = new Bubble();
+                        boolean isSelected = false;
+                        for (Bubble bubble : mBubbles) {
+                            if (checkTouchBubble(bubble, x, y) || checkTouchPath(bubble.getPath(), (int)x, (int)y)) {
+                                isSelected = true;
+                                selectedBubble = bubble;
+                                bubble.setSelected(true);
+                                StatisticsBase.onNlogStatEvent(CameraStatistic.CAMERA_WHOLE_SEARCH_BUBBLE_PATH_CLICK, "answerNum", bubble.getContent());
+                            }
+                        }
+
+                        if (isSelected) {
+                            for (Bubble bubble : mBubbles) {
+                                if (bubble.getIndex() != selectedBubble.getIndex()) {
+                                    bubble.setSelected(false);
+                                }
+                            }
+                            if (iClick != null) {
+                                iClick.bubbleClick(selectedBubble.getIndex());
+                            }
+                        }
+                    }
+                    mIsZoomDetected = false;
+                }
+                break;
+        }
+        return false;
+    }
+
+    /**
+     * Returns the current image scale
+     *
+     * @return
+     */
+    public float getScaleX(Matrix matrix) {
+        return getValue(matrix, Matrix.MSCALE_X);
+    }
+
+    public float getScaleY(Matrix matrix) {
+        return getValue(matrix, Matrix.MSCALE_Y);
+    }
+
+    public float getTranslationX(Matrix matrix) {
+        return getValue(matrix, Matrix.MTRANS_X);
+    }
+
+    public float getTranslationY(Matrix matrix) {
+        return getValue(matrix, Matrix.MTRANS_Y);
+    }
+
+    private float getValue(Matrix matrix, int whichValue) {
+        matrix.getValues(mMatrixValues);
+        return mMatrixValues[whichValue];
+    }
+
+    private boolean checkTouchPath(Path path, int x, int y) {
+        RectF bounds = new RectF();
+        path.computeBounds(bounds, true);
+        Region region = new Region();
+        region.setPath(path, new Region((int) bounds.left, (int) bounds.top, (int) bounds.right, (int) bounds.bottom));
+        return region.contains(x, y);
+    }
+
+    /***
+     * 检查触摸的点是否含有标签
+     * @param x 点x
+     * @param y 点y
+     * @return 选中的bubble，null：当前点不含bubble
+     */
+    private boolean checkTouchBubble(Bubble bubble, float x, float y) {
+        final Rect rect = bubble.getRect(bubble);
+        rect.left -= 10;
+        rect.top -= 10;
+        rect.right += 10;
+        rect.bottom += 10;
+        if (rect.contains((int) x, (int) y)) {
+            return true;
+        }
+        return false;
+    }
+}
