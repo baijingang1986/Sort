@@ -1,0 +1,321 @@
+package com.baidu.homework.common.photo.core;
+
+import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Matrix;
+import android.graphics.Paint;
+import android.graphics.PaintFlagsDrawFilter;
+import android.graphics.Path;
+import android.graphics.Rect;
+import android.graphics.RectF;
+
+import com.baidu.homework.R;
+import com.baidu.homework.common.ui.util.ScreenUtil;
+import com.baidu.homework.common.utils.BitmapUtil;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * @author zyb
+ */
+
+public class DrawHelper {
+    public final static int PHOTO_EXP_PADDING = ScreenUtil.dp2px(4);
+    public final static int PHOTO_EXP_RADIUS = ScreenUtil.dp2px(2);
+
+    private final static int TEXT_OFFSET_HALF = ScreenUtil.dp2px(0.5f);
+    private final static int TEXT_OFFSET_ONE = ScreenUtil.dp2px(1);
+    private final static int TEXT_OFFSET_ONE_HALF = ScreenUtil.dp2px(1.5f);
+    private final static int TEXT_OFFSET_TWO_HALF = ScreenUtil.dp2px(2.5f);
+
+    private static final float DEF_STROKE_WIDTH = ScreenUtil.dp2px(0);
+    private static final float DEF_ROUND_RADIUS = PHOTO_EXP_RADIUS;
+    private static final float DEF_ICON_SCALE = 0.66F;
+
+    private boolean bubbleSizeChange = true;
+
+    private Paint mPathPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private Paint mTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private Paint mBubblePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private float mStrokeWidth = DEF_STROKE_WIDTH;
+    private float mRoundRadius = DEF_ROUND_RADIUS;
+
+    private Context mContext;
+    private List<Path> mPaths = new ArrayList<>();
+    private List<Bubble> mBubbles = new ArrayList<>();
+    private RectF mTmpRectF = new RectF();
+    private int mImgScale = 1;
+    private Bitmap mUnknownBitmap, mRightBitmap, mBitmap, mSelectedBitmap, mTwoDigitsBitmap, mTwoDigitsSelectedBitmap;
+    ImageDecorContainer mImageDectorContainer;
+
+    public DrawHelper(Context context, ImageDecorContainer container) {
+        mContext = context;
+        mImageDectorContainer = container;
+        mPathPaint.setStyle(Paint.Style.FILL);
+        mPathPaint.setColor(Color.parseColor("#29000000"));
+        mPathPaint.setStrokeWidth(mStrokeWidth);
+
+        mTextPaint.setColor(Color.parseColor("#FFFFFF"));
+        mTextPaint.setTextSize(ScreenUtil.sp2px(16));
+        mTextPaint.setStyle(Paint.Style.FILL);
+
+        mBitmap = BitmapUtil.getBitmapFromRes(mContext, R.drawable.bubble_onedigit, Bubble.getWidth(), Bubble.getHeight());
+        mSelectedBitmap = BitmapUtil.getBitmapFromRes(mContext, R.drawable.bubble_onedigit_click, Bubble.getWidth(), Bubble.getHeight());
+        mTwoDigitsBitmap = BitmapUtil.getBitmapFromRes(mContext, R.drawable.bubble_twodigit, Bubble.getTwoDigitsWidth(), Bubble.getHeight());
+        mTwoDigitsSelectedBitmap = BitmapUtil.getBitmapFromRes(mContext, R.drawable.bubble_twodigit_click, Bubble.getTwoDigitsWidth(), Bubble.getHeight());
+    }
+
+    public void setBubbleSizeChange(boolean unchage) {
+        bubbleSizeChange = unchage;
+    }
+
+    public void setScale(float scale) {
+        mStrokeWidth = DEF_STROKE_WIDTH * scale / mImgScale;
+        mRoundRadius = DEF_ROUND_RADIUS / mImgScale;
+        mPathPaint.setStrokeWidth(mStrokeWidth);
+    }
+
+    public void drawAll(Canvas canvas, Rect drawableBound) {
+        for (Bubble bubble : mBubbles) {
+            drawPath(canvas, bubble);
+        }
+
+        //bubble是否固定大小
+        if (bubbleSizeChange) {
+            drawAllBubbles(canvas);
+        } else {
+            Matrix matrix = mImageDectorContainer.getDrawableMatrix();
+            float scaleX = 1;
+            float scaleY = 1;
+            if (matrix != null) {
+                scaleX = mImageDectorContainer.getScaleX(matrix);
+                scaleY = mImageDectorContainer.getScaleX(matrix);
+                Matrix matrix1 = new Matrix();
+                matrix1.postScale(1/scaleX, 1/scaleY);
+                canvas.concat(matrix1);
+            } else {
+                Matrix matrix1 = new Matrix();
+                canvas.concat(matrix1);
+            }
+            drawAllBubbles(canvas, scaleX, scaleY);
+        }
+    }
+
+    private void drawPath(Canvas canvas, Bubble bubble) {
+        if (bubble.isSelected()) {
+            mPathPaint.setColor(Color.parseColor("#3345B7FF"));
+        } else {
+            mPathPaint.setColor(Color.parseColor("#29000000"));
+        }
+        canvas.drawPath(bubble.getPath(), mPathPaint);
+    }
+
+    /**
+     * bubble大小改变,待适配
+     * @param canvas
+     */
+    public void drawAllBubbles(Canvas canvas) {
+        if (mBubbles != null && !mBubbles.isEmpty()) {
+            int bubbleWidth;
+            Rect bounds=new Rect();
+            canvas.setDrawFilter(new PaintFlagsDrawFilter(0, Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG));
+            for (Bubble bubble : mBubbles) {
+                if (bubble.getIndex() >= 9) {
+                    bubbleWidth = Bubble.getTwoDigitsWidth();
+                    if (bubble.isSelected()) {
+                        canvas.drawBitmap(mTwoDigitsSelectedBitmap, bubble.getX(), bubble.getY(), mBubblePaint);
+                    } else {
+                        canvas.drawBitmap(mTwoDigitsBitmap, bubble.getX(), bubble.getY(), mBubblePaint);
+                    }
+                } else {
+                    bubbleWidth = Bubble.getWidth();
+                    if (bubble.isSelected()) {
+                        canvas.drawBitmap(mSelectedBitmap, bubble.getX(), bubble.getY(), mBubblePaint);
+                    } else {
+                        canvas.drawBitmap(mBitmap, bubble.getX(), bubble.getY(), mBubblePaint);
+                    }
+                }
+                String content = bubble.getContent();
+                mTextPaint.getTextBounds(content, 0, content.length(), bounds);
+                int contentWidth = bounds.width();
+                int contentHeight = bounds.height();
+                canvas.drawText(content, ((bubble.getX()*2 + bubbleWidth) - contentWidth) / 2 - 1, ((bubble.getY()*2 + bubble.getHeight()) + contentHeight) / 2 - 1, mTextPaint);
+            }
+        }
+    }
+
+    /**
+     * bubble大小不变
+     * @param canvas
+     * @param scaleX
+     * @param scaleY
+     */
+    public void drawAllBubbles(Canvas canvas, float scaleX, float scaleY) {
+        if (mBubbles != null && !mBubbles.isEmpty()) {
+            int bubbleWidth;
+            Rect bounds = new Rect();
+            canvas.setDrawFilter(new PaintFlagsDrawFilter(0, Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG));
+            for (Bubble bubble : mBubbles) {
+                float bubbleY = bubble.getY()*scaleY + bubble.getHeight()*(scaleY-1);
+                String content = bubble.getContent();
+                mTextPaint.getTextBounds(content, 0, content.length(), bounds);
+                int contentWidth = bounds.width();
+                int contentHeight = bounds.height();
+                if (bubble.getIndex() >= 9) {
+                    bubbleWidth = Bubble.getTwoDigitsWidth();
+                    if (bubble.getIndex() % 2 == 0) {
+                        if (bubble.isSelected()) { //选中bubble和数字透明
+                        } else {
+                            canvas.drawBitmap(mTwoDigitsBitmap, bubble.getX()*scaleX, bubbleY, mBubblePaint);
+                            if (bubble.getIndex() == 10) {
+                                canvas.drawText(content, ((bubble.getX()*scaleX*2 + bubbleWidth) - contentWidth) / 2 - TEXT_OFFSET_ONE_HALF, ((bubbleY*2 + Bubble.getHeight()) + contentHeight) / 2 - TEXT_OFFSET_ONE, mTextPaint);
+                            } else {
+                                canvas.drawText(content, ((bubble.getX()*scaleX*2 + bubbleWidth) - contentWidth) / 2 - TEXT_OFFSET_HALF, ((bubbleY*2 + Bubble.getHeight()) + contentHeight) / 2 - TEXT_OFFSET_ONE, mTextPaint);
+                            }
+                        }
+                    } else {
+                        if (bubble.isSelected()) {
+                        } else {
+                            canvas.drawBitmap(mTwoDigitsBitmap, bubble.getX()*scaleX + bubbleWidth*(scaleX-1), bubbleY, mBubblePaint);
+                            canvas.drawText(content, (((bubble.getX()*scaleX + bubbleWidth*(scaleX-1))*2 + bubbleWidth) - contentWidth) / 2 - TEXT_OFFSET_HALF, ((bubbleY*2 + Bubble.getHeight()) + contentHeight) / 2 - TEXT_OFFSET_ONE, mTextPaint);
+                        }
+                    }
+                } else {
+                    bubbleWidth = Bubble.getWidth();
+                    if (bubble.getIndex() % 2 == 0) {
+                        if (bubble.isSelected()) {
+                        } else {
+                            canvas.drawBitmap(mBitmap, bubble.getX()*scaleX, bubbleY, mBubblePaint);
+                            //单独处理1,5,6,7
+                            if (bubble.getIndex() == 0) {
+                                canvas.drawText(content, ((bubble.getX()*scaleX*2 + bubbleWidth) - contentWidth) / 2 - TEXT_OFFSET_TWO_HALF, ((bubbleY*2 + Bubble.getHeight()) + contentHeight) / 2 - TEXT_OFFSET_ONE, mTextPaint);
+                            } else if (bubble.getIndex() == 4 || bubble.getIndex() == 5) {
+                                canvas.drawText(content, ((bubble.getX()*scaleX*2 + bubbleWidth) - contentWidth) / 2 - TEXT_OFFSET_ONE, ((bubbleY*2 + Bubble.getHeight()) + contentHeight) / 2 - TEXT_OFFSET_ONE, mTextPaint);
+                            } else if (bubble.getIndex() == 6) {
+                                canvas.drawText(content, ((bubble.getX()*scaleX*2 + bubbleWidth) - contentWidth) / 2, ((bubbleY*2 + Bubble.getHeight()) + contentHeight) / 2 - TEXT_OFFSET_ONE, mTextPaint);
+                            } else {
+                                canvas.drawText(content, ((bubble.getX()*scaleX*2 + bubbleWidth) - contentWidth) / 2 - TEXT_OFFSET_HALF, ((bubbleY*2 + Bubble.getHeight()) + contentHeight) / 2 - TEXT_OFFSET_ONE, mTextPaint);
+                            }
+                        }
+                    } else {
+                        if (bubble.isSelected()) {
+                        } else {
+                            canvas.drawBitmap(mBitmap, bubble.getX()*scaleX + bubbleWidth*(scaleX-1), bubbleY, mBubblePaint);
+                            canvas.drawText(content, (((bubble.getX()*scaleX + bubbleWidth*(scaleX-1))*2 + bubbleWidth) - contentWidth) / 2 - TEXT_OFFSET_HALF, ((bubbleY*2 + Bubble.getHeight()) + contentHeight) / 2 - TEXT_OFFSET_ONE, mTextPaint);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private void drawBitmap(Canvas canvas, int l, int t, int r, int b, Rect drawableBound, Bitmap bitmap) {
+        if (bitmap != null) {
+            float left = r - PHOTO_EXP_PADDING - bitmap.getWidth();
+            canvas.drawBitmap(bitmap, left, (b + t - bitmap.getHeight()) / 2, null);
+        }
+    }
+
+    private int getIconSize(Bitmap bitmap) {
+        return bitmap == null ? 0 : bitmap.getWidth();
+    }
+
+    private void drawRoundRect(Canvas canvas, int l, int t, int r, int b, Rect drawableBound) {
+        int w = (int) (mStrokeWidth / 2);
+
+        if (l < drawableBound.left + w) {
+            l = drawableBound.left + w;
+        }
+
+        if (t < drawableBound.top + w) {
+            t = drawableBound.top + w;
+        }
+
+        if (r > drawableBound.right - w) {
+            r = drawableBound.right - w;
+        }
+
+        if (b > drawableBound.bottom - w) {
+            b = drawableBound.bottom - w;
+        }
+        mTmpRectF.set(l, t, r, b);
+        canvas.drawRoundRect(mTmpRectF, mRoundRadius, mRoundRadius, mPathPaint);
+    }
+
+    private int getImgScaleNum(long num) {
+        return (int) (num / mImgScale);
+    }
+
+    /*
+    private Rect calRectBound(SearchResult.AreasRect originalRect, Rect rect, final Rect drawableBound, int iconSize) {
+        int l = getImgScaleNum(originalRect.left), t = getImgScaleNum(originalRect.top), r = getImgScaleNum(originalRect.right), b = getImgScaleNum(originalRect.bottom);
+        int w = 0;
+        if (iconSize > 0) {
+            w = PHOTO_EXP_PADDING + iconSize;
+        }
+        if (drawableBound != null) {
+            l = (drawableBound.left + l - PHOTO_EXP_PADDING);
+            if (l < 0) {
+                l = 0;
+            }
+            t = (drawableBound.top + t - PHOTO_EXP_PADDING);
+            if (t < 0) {
+                t = 0;
+            }
+            r = (drawableBound.left + r + PHOTO_EXP_PADDING + w);
+            if (r > drawableBound.right) {
+                r = drawableBound.right;
+            }
+            b = (drawableBound.top + b + PHOTO_EXP_PADDING);
+            if (b > drawableBound.bottom) {
+                b = drawableBound.bottom;
+            }
+        }
+        if (rect == null) {
+            rect = new Rect(l, t, r, b);
+        } else {
+            rect.set(l, t, r, b);
+        }
+        return rect;
+    }*/
+
+    public void setImgScale(int imgScale) {
+        if (imgScale > 0) {
+            mImgScale = imgScale;
+        }
+    }
+
+    public void setPath(List<Path> paths) {
+        mPaths.clear();
+        if (mPaths != null) {
+            mPaths.addAll(paths);
+        }
+    }
+
+    public void setBubbles(List<Bubble> list) {
+        if (list != null) {
+            mBubbles.clear();
+            mBubbles.addAll(list);
+        }
+    }
+
+    public void setAvgHeight(int avgHeight) {
+        int mAvgHeight = getAvgHeight(avgHeight);
+        if (mAvgHeight > 0) {
+            int size = Math.round(mAvgHeight * DEF_ICON_SCALE);
+            mRightBitmap = BitmapUtil.getBitmapFromRes(mContext, R.drawable.bubble_onedigit_click, size, size);
+            mUnknownBitmap = null;
+        }
+    }
+
+    public int getAvgHeight(int avgHeight) {
+        if (mImgScale > 0) {
+            return avgHeight / mImgScale;
+        }
+
+        return avgHeight;
+    }
+}
