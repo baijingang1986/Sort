@@ -1,0 +1,1160 @@
+package com.baidu.homework.common.photo.core;
+
+import android.animation.Animator;
+import android.animation.AnimatorSet;
+import android.animation.ValueAnimator;
+import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Matrix;
+import android.graphics.PointF;
+import android.graphics.RectF;
+import android.graphics.drawable.Drawable;
+import android.util.AttributeSet;
+import android.view.GestureDetector;
+import android.view.GestureDetector.OnDoubleTapListener;
+import android.view.GestureDetector.OnGestureListener;
+import android.view.MotionEvent;
+import android.view.animation.TranslateAnimation;
+import android.widget.ImageView;
+import android.widget.Scroller;
+
+import com.baidu.homework.common.StatisticsEvents;
+import com.baidu.homework.common.statistics.StatisticsBase;
+
+import java.util.ArrayList;
+import java.util.List;
+
+
+public class SearchResultTouchImageView extends ImageView implements OnGestureListener, OnDoubleTapListener,
+        ZoomDetector.OnZoomListener {
+    @SuppressWarnings("unused")
+    private static final String TAG = SearchResultTouchImageView.class.getSimpleName();
+
+    // Scale range
+    private float mMinScale = PhotoConfig.MIN_SCALE;
+    private float mMaxScale = PhotoConfig.MAX_SCALE;
+    // These matrices will be used to move and zoom image
+    protected Matrix mCurMatrix = new Matrix();
+    private Matrix mSavedMatrix = new Matrix();
+
+    private GestureDetector mGestureDetector;
+
+    private ZoomDetector mZoomDetector;
+
+    private Bitmap mBitmap;
+
+    private ImageDecorContainer mDectorContainer;
+
+    private boolean mIsDoubleClickDisabled;
+    private boolean mIsZoomDisabled;
+
+    public void setIsZoomDisabled(boolean mIsZoomDisabled) {
+        this.mIsZoomDisabled = mIsZoomDisabled;
+    }
+
+    //图片脱离底部的高度
+    private int offBottomHeight;
+
+    /**
+     * 图片的移动边界(灌满)
+     */
+    private RectF mCenterRegion;
+
+    /**
+     * Executes the delta scrolls from a fling or scroll movement.
+     */
+    private FlingRunnable mFlingRunnable = new FlingRunnable();
+
+    private OnDrawListener mOnDrawListener;
+
+    /**
+     * 图片在滚动时，会脱离边缘，自动回弹
+     */
+    private class AutoEdgeRunnable implements Runnable {
+        @Override
+        public void run() {
+            if (getCurrentTransY() > 0) {
+                mCurMatrix.postTranslate(0, -getCurrentTransY());
+            }
+            if (getCurrentTransX() > 0) {
+                mCurMatrix.postTranslate(-getCurrentTransX(), 0);
+            }
+            final RectF currentRect = getCurrentRect();
+            if (currentRect.right < getWidth()) {
+                mCurMatrix.postTranslate(getWidth() - currentRect.right, 0);
+            }
+            if (currentRect.bottom < offBottomHeight) {
+                mCurMatrix.postTranslate(0, offBottomHeight - currentRect.bottom);
+            }
+            setImageMatrix(mCurMatrix);
+        }
+    }
+
+    /**
+     * @param context
+     * @param attrs
+     * @param defStyle
+     */
+    public SearchResultTouchImageView(Context context, AttributeSet attrs, int defStyle) {
+        super(context, attrs, defStyle);
+        init();
+    }
+
+    /**
+     * @param context
+     * @param attrs
+     */
+    public SearchResultTouchImageView(Context context, AttributeSet attrs) {
+        super(context, attrs);
+        init();
+    }
+
+    /**
+     * @param context
+     */
+    public SearchResultTouchImageView(Context context) {
+        super(context);
+        init();
+    }
+
+    private void init() {
+        setScaleType(ScaleType.MATRIX);
+
+        mGestureDetector = new GestureDetector(getContext(), this);
+        mGestureDetector.setIsLongpressEnabled(false);
+
+        mZoomDetector = new ZoomDetector(getContext(), this);
+    }
+
+    public void setImageDectorContainer(ImageDecorContainer decorContainer) {
+        mDectorContainer = decorContainer;
+    }
+
+    public void translate(float transX, float transY) {
+        mCurMatrix.postTranslate(transX, transY);
+        setImageMatrix(mCurMatrix);
+    }
+
+    public void translateAnim(final float transX, final float transY) {
+        ValueAnimator animatorX, animatorY;
+        List<Animator> animList = new ArrayList<>();
+        AnimatorSet animSet;
+        animSet = new AnimatorSet();
+        animSet.addListener(new Animator.AnimatorListener() {
+            @Override
+            public void onAnimationStart(Animator animation) {
+
+            }
+
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                mCurMatrix.postTranslate(transX, transY);
+                setImageMatrix(mCurMatrix);
+            }
+
+            @Override
+            public void onAnimationCancel(Animator animation) {
+
+            }
+
+            @Override
+            public void onAnimationRepeat(Animator animation) {
+
+            }
+        });
+
+        animatorX = ValueAnimator.ofFloat(0, transX * 100);
+        animatorX.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override
+            public void onAnimationUpdate(ValueAnimator animation) {
+                float valueX = (float) animation.getAnimatedValue() / 100;
+                mCurMatrix.postTranslate(valueX, 0);
+                setImageMatrix(mCurMatrix);
+                mCurMatrix.postTranslate(-valueX, 0);
+            }
+        });
+        animatorY = ValueAnimator.ofFloat(0, transY * 100);
+        animatorY.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override
+            public void onAnimationUpdate(ValueAnimator animation) {
+                float valueY = (float) animation.getAnimatedValue() / 100;
+                mCurMatrix.postTranslate(0, valueY);
+                setImageMatrix(mCurMatrix);
+                mCurMatrix.postTranslate(-0, -valueY);
+            }
+        });
+
+        animList.add(animatorX);
+        animList.add(animatorY);
+
+        animSet.setDuration(300);
+        animSet.playTogether(animList);
+        animSet.start();
+    }
+
+    /**
+     * 图片是否可以脱离屏幕边缘
+     * @param offBottomHeight
+     */
+    public void setOffBottomHeight(int offBottomHeight) {
+        this.offBottomHeight = offBottomHeight;
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        if (isBitmapNotExists()) {
+            return false;
+        }
+
+        int action = event.getActionMasked();
+        if (action == MotionEvent.ACTION_DOWN) {
+            mFlingRunnable.stop();
+        }
+
+        boolean assume = false;
+        if (isEnabled()) {
+            assume = mZoomDetector.onTouchEvent(event);
+        }
+
+        mGestureDetector.onTouchEvent(event);
+
+        //处理bubble点击事件
+        if (mDectorContainer != null) {
+            mDectorContainer.handleClick(event);
+        }
+
+        if (action == MotionEvent.ACTION_DOWN) {
+            getParent().requestDisallowInterceptTouchEvent(true);
+        }
+
+        if (action == MotionEvent.ACTION_DOWN) {
+            return true;
+        }
+
+        if (action == MotionEvent.ACTION_UP) {
+            post(new AutoEdgeRunnable());
+        }
+
+        return assume;
+    }
+
+    @Override
+    protected void onLayout(boolean changed, int left, int top, int right,
+                            int bottom) {
+        super.onLayout(changed, left, top, right, bottom);
+        setImageMatrixCenter();;
+    }
+
+    @Override
+    public boolean onZoomStart(MotionEvent evDown, MotionEvent evDownPointer) {
+        if (mIsZoomDisabled) return false;
+        mSavedMatrix.set(mCurMatrix);
+        return true;
+    }
+
+    @Override
+    public boolean onZoomEnd(MotionEvent evDown, MotionEvent evDownPointer, MotionEvent event) {
+        if (mIsZoomDisabled) return false;
+        mSavedMatrix.set(mCurMatrix);
+
+        if(this.onZoomListener != null)
+        {
+            this.onZoomListener.onZoomEnd();
+        }
+
+        return true;
+    }
+
+    @Override
+    public boolean onZoom(MotionEvent evDown, MotionEvent evDownPointer, MotionEvent event,
+                          PointF midPoint, float scale) {
+        if (mIsZoomDisabled) return false;
+        System.out.println("TouchImageView.onZoom " + ", midPoint = [" + midPoint + "], scale = [" + scale + "]");
+        if (isBitmapNotExists()) {
+            return false;
+        }
+
+        mCurMatrix.set(mSavedMatrix);
+
+        float currentScale = getCurrentScale();
+        System.out.println("currentScale = " + currentScale);
+
+        float resultScale = currentScale * scale;
+        System.out.println("resultScale = " + resultScale);
+        // 控制图片大小
+        if (resultScale < mMinScale) {
+            scale = mMinScale / currentScale;
+        } else if (resultScale > mMaxScale) {
+            scale = mMaxScale / currentScale;
+        }
+        if (scale == Float.POSITIVE_INFINITY)
+            scale = mMinScale;
+
+        mCurMatrix.postScale(scale, scale, midPoint.x, midPoint.y);
+
+        center(true,true);
+        setImageMatrixCenter();
+        if(mOnBitmapScalChangedListener != null){
+            mOnBitmapScalChangedListener.onScaleChanged(scale > 1f, getCurrentRect());
+        }
+        return true;
+    }
+
+    @Override
+    public void setImageBitmap(Bitmap bm) {
+        if(bm == null){
+            if(mBitmap != null){
+                mBitmap.recycle();;
+                mBitmap = null;
+            }
+        }
+        mBitmap = bm;
+        super.setImageBitmap(bm);
+        setNeedClean(false);
+    }
+
+    public void setNeedClean(boolean needClean) {
+        if (needClean)// 不显示view
+            setVisibility(INVISIBLE);
+        else {//可以显示view了
+            if (getVisibility() != VISIBLE) setVisibility(VISIBLE);
+        }
+    }
+    private void setImageBitmapCenter(Bitmap bm){
+        if(mBitmap == null || bm != mBitmap){
+            setImageBitmap(bm);
+        }
+        setImageBitmap(bm);
+        mBitmap = bm;
+        if (mBitmap != null) {
+            center(true, true);
+            setImageMatrixCenter();
+        }
+    }
+
+    private void setImageMatrixCenter(){
+//        center(true, true);
+        setImageMatrix(mCurMatrix);
+    }
+
+    public void setOnDrawListener(OnDrawListener drawListener) {
+        mOnDrawListener = drawListener;
+    }
+
+    @Override
+    protected void onDraw(Canvas canvas) {
+        try {
+            super.onDraw(canvas);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        if (mOnDrawListener != null) {
+            mOnDrawListener.onDraw(this);
+        }
+    }
+
+    @Override
+    public void setImageResource(int resId) {
+        final Drawable drawable = getResources().getDrawable(resId);
+        final float dx = (getWidth() - drawable.getMinimumWidth()) / 2;
+        final float dy = (getHeight() - drawable.getMinimumHeight()) / 2;
+        mCurMatrix.postTranslate(dx, dy);
+        setImageMatrixCenter();
+        setImageDrawable(drawable);
+        setNeedClean(false);
+    }
+
+    @Override
+    public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+//        if (!isEnabled()) {
+//            return false;
+//        }
+//
+//        if (isBitmapNotExists()) {
+//            return false;
+//        }
+//
+//        int initialVelocityX = 0;
+//        int initialVelocityY = 0;
+//        // 只在速度较大的轴上滑动
+//        if (Math.abs(velocityX) > Math.abs(velocityY)) {
+//            initialVelocityX = (int) velocityX;
+//            initialVelocityY = 0;
+//        } else {
+//            initialVelocityX = 0;
+//            initialVelocityY = (int) velocityY;
+//        }
+//
+//        mSavedMatrix.set(mCurMatrix);
+//        mFlingRunnable.startUsingVelocity(initialVelocityX, initialVelocityY);
+//
+//        return true;
+
+        return false;
+    }
+
+    @Override
+    public boolean onDown(MotionEvent e) {
+        return false;
+    }
+
+    @Override
+    public void onShowPress(MotionEvent e) {
+    }
+
+    @Override
+    public boolean onSingleTapUp(MotionEvent e) {
+        return false;
+    }
+
+    @Override
+    public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
+        if(mZoomDetector !=null && mZoomDetector.isZooming()){//放大缩小时，不响应拖拽事件
+            return false;
+        }
+        final RectF currentRect = getCurrentRect();
+        //判断是否已经滑到了边缘
+        if (Math.abs(distanceX) > Math.abs(distanceY)) {
+            if ((currentRect.left > -1 && distanceX < 0)
+                    || (currentRect.right < getWidth() + 1 && distanceX > 0)) {
+                getParent().requestDisallowInterceptTouchEvent(false);
+                return false;
+            }
+        }else if(Math.abs(distanceY) > Math.abs(distanceX)){
+            if ((currentRect.top > -1 && distanceY < 0)
+                    || (currentRect.bottom < offBottomHeight + 1 && distanceY > 0)) {
+                getParent().requestDisallowInterceptTouchEvent(false);
+                return false;
+            }
+        }
+
+        if (!isEnabled()) {
+            return false;
+        }
+
+        if (isBitmapNotExists()) {
+            return false;
+        }
+
+        if (((currentRect.left > -1 && distanceX < 0) || (currentRect.right < getWidth() + 1 && distanceX > 0))) {
+            mCurMatrix.postTranslate(0, -distanceY);
+        } else if ((currentRect.top > -1 && distanceY < 0) || (currentRect.bottom < offBottomHeight && distanceY > 0)) {
+            mCurMatrix.postTranslate(-distanceX, 0);
+        } else {
+            mCurMatrix.postTranslate(-distanceX, -distanceY);
+        }
+
+        setImageMatrixCenter();
+
+        if(mOnBitmapScalChangedListener != null){
+            mOnBitmapScalChangedListener.onImageMove(currentRect);
+        }
+        return true;
+    }
+
+    @Override
+    public void onLongPress(MotionEvent e) {
+    }
+
+
+
+    @Override
+    public boolean onDoubleTap(MotionEvent e) {
+        if (isBitmapNotExists()) {
+            return false;
+        }
+        if (isEnabled() && mIsDoubleClickDisabled) {
+            StatisticsBase.onNlogStatEvent(StatisticsEvents.QUESTION_IMAGE_EXPLORER_CLICK_DOUBLE);
+            //场景一，请勿删除
+            /*if(getCurrentRect().width() > mBitmap.getWidth()){//图片被放大，则按照原始大小显示
+        		showBitmapCenterInside(mBitmap);
+        	}else if(getCurrentRect().width() <= mBitmap.getWidth()){//图片被缩小，则灌满显示
+        		showBitmapFitCenter(mBitmap, mFitXYRect);
+        	}*/
+            //场景二
+            /*if((getCurrentRect().width() == mCenterRegion.width()
+                    && getCurrentRect().height() <= mCenterRegion.height())
+                    || (getCurrentRect().height() == mCenterRegion.height()
+                    && getCurrentRect().width() <= mCenterRegion.width())){//当前为fitcenter，则centerCrop显示
+                showBitmapCenterCrop(mBitmap);
+            }else{//使用centerFit显示
+                showBitmapFitCenter(mBitmap);
+            }*/
+
+            //场景三,双击复原图片
+            if (getCurrentScale() > mMinScale) {
+                showBitmapCenterCrop(mBitmap);
+            }
+
+            if(mOnBitmapScalChangedListener != null){
+                mOnBitmapScalChangedListener.onScaleChanged(false, getCurrentRect());
+            }
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean onDoubleTapEvent(MotionEvent e) {
+        return false;
+    }
+
+    /********************************************************/
+
+    /**
+     * 把图片按比例扩大/缩小到View的宽度，居中显示（图片灌满居中显示）
+     */
+    public void showBitmapFitCenter(Bitmap bitmap){
+        if(mBitmap == null || mBitmap != bitmap){
+            setImageBitmap(bitmap);
+        }
+        if(mFlingRunnable != null){
+            mFlingRunnable.stop();
+        }
+
+        //重新计算最小值
+        float scaleX = (mCenterRegion.width())/mBitmap.getWidth();
+        float scaleY = (mCenterRegion.height())/mBitmap.getHeight();
+        float scale = Math.min(scaleX, scaleY);
+        mMinScale = Math.min(mMinScale, scale);
+        mMaxScale = Math.max(mMaxScale, scale);
+        zoomMin = mMinScale;
+        zoomMax = mMaxScale;
+
+        float postScaleX = (mCenterRegion.width())/getCurrentRect().width();
+        float postScaleY = (mCenterRegion.height())/getCurrentRect().height();
+        float postScale = Math.min(postScaleX, postScaleY);
+
+        mCurMatrix.postScale(postScale, postScale);
+        center(true, true);
+        setImageMatrixCenter();
+        /*
+    	if(mOnBitmapScalChangedListener != null){
+    		mOnBitmapScalChangedListener.onScaleChanged(false, getCurrentRect());
+    	}
+    	*/
+    }
+
+    private float zoomMin = PhotoConfig.MIN_SCALE;
+    private float zoomMax = PhotoConfig.MAX_SCALE;
+    private float zoomUpRate = 1.5f;
+    private float zoomDownRate = 0.5f;
+
+    /**
+     * 配置zoom 操作时候的相关配置
+     * @param zoomMin zoom的最小scale
+     * @param zoomMax zoom的最大scale
+     * @param zoomUpRate 放大rate
+     * @param zoomDownRate 缩小的rate
+     */
+    private void setZoomConfig(float zoomMin,float zoomMax,float zoomUpRate,float zoomDownRate){
+        this.zoomMin = zoomMin;
+        this.zoomMax = zoomMax;
+        this.zoomUpRate = zoomUpRate;
+        this.zoomDownRate = zoomDownRate;
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        if(mBitmap != null && !mBitmap.isRecycled()){
+            mBitmap.recycle();
+        }
+    }
+
+    /**
+     * zoom 按增量进行放大或缩小
+     *
+     * @param isUp true表示放大，false表示缩小
+     * @return true表示达到峰值了（最大/最小值）
+     */
+    public boolean zoom(boolean isUp) {
+        boolean isOverLimit;
+
+        float curScale = getCurrentScale();
+        float dScale;
+        if (isUp) {
+            isOverLimit = curScale * zoomUpRate > zoomMax;
+            dScale = isOverLimit ? zoomMax / curScale : zoomUpRate;
+        } else {
+            isOverLimit = curScale * zoomDownRate < zoomMin;
+            dScale = isOverLimit ? zoomMin / curScale : zoomDownRate;
+        }
+
+        mCurMatrix.postScale(dScale, dScale);
+        setImageMatrixCenter();
+
+        return isOverLimit;
+    }
+
+    /**
+     * 是否zoom达到了最大值或最小值
+     * @return true表示达到了边界值
+     */
+    public boolean isOverLimit() {
+        boolean isOverLimit = false;
+        try {
+            float curScale = getCurrentScale();
+            isOverLimit = (curScale <= zoomMin || curScale >= zoomMax);
+        }catch(Exception e){}
+        return isOverLimit;
+    }
+
+    /**
+     * 是否zoom达到了最大值
+     * @return
+     */
+    public boolean isOverMaxLimit(){
+        boolean isOverMaxLimit = false;
+        try {
+            float curScale = getCurrentScale();
+            isOverMaxLimit = (curScale >= zoomMax);
+        }catch(Exception e){}
+        return isOverMaxLimit;
+    }
+
+    /**
+     * 是否zoom达到了最小值
+     * @return
+     */
+    public boolean isOverMinLimit(){
+        boolean isOverMaxLimit = false;
+        try {
+            float curScale = getCurrentScale();
+            isOverMaxLimit = (curScale <= zoomMin);
+        }catch(Exception e){}
+        return isOverMaxLimit;
+    }
+
+    /**
+     * 将图片的内容完整居中显示，通过按比例缩小或原来的size使得图片长/宽等于或小于View的长/宽
+     */
+    public void showBitmapCenterInside(Bitmap bitmap){
+        if(bitmap != null && mBitmap != bitmap){
+            setImageBitmap(bitmap);
+        }
+        if(mBitmap.getWidth() > mCenterRegion.width() || mBitmap.getHeight() > mCenterRegion.height()){
+            showBitmapFitCenter(mBitmap);
+        }else{
+            mCurMatrix.setScale(1, 1);
+            setImageMatrixCenter();
+            /*
+        	if(mOnBitmapScalChangedListener != null){
+        		mOnBitmapScalChangedListener.onScaleChanged(false, getCurrentRect());
+        	}
+        	*/
+        }
+    }
+
+    /**
+     * 用于重拍以后将view旋转回来
+     */
+    public void resetView(){
+        mCurMatrix.setRotate(0);
+    }
+
+    public void rotate(int rotate){
+        if(mBitmap == null){
+            return;
+        }
+        if(mFlingRunnable != null){
+            mFlingRunnable.stop();
+        }
+        mCurMatrix.postRotate(rotate, 0.5f, 0.5f);
+        showBitmapFitCenter(mBitmap);
+    }
+
+    public void showBitmapCenterCrop(Bitmap bitmap){
+        if(bitmap != null && mBitmap != bitmap){
+            setImageBitmap(bitmap);
+        }
+        if(mFlingRunnable != null){
+            mFlingRunnable.stop();
+        }
+        float scaleX = (mCenterRegion.width())/mBitmap.getWidth();
+        float scaleY = (mCenterRegion.height())/mBitmap.getHeight();
+        float scale = Math.max(scaleX, scaleY);
+        mMinScale = scaleX;
+        mMaxScale = mMinScale * 1.5f;
+        mCurMatrix.setScale(scale, scale);
+        setImageMatrixCenter();
+        /*
+    	if(mOnBitmapScalChangedListener != null){
+    		mOnBitmapScalChangedListener.onScaleChanged(scale > 1, getCurrentRect());
+    	}
+    	*/
+    }
+
+    public void setMinScale(float scale){
+        mMinScale = scale;
+    }
+
+    public float getMinScale(){
+        return mMinScale;
+    }
+
+    public void setMaxScale(float scale){
+        mMaxScale = scale;
+    }
+
+    /**
+     * 获取当前图片的缩放比例
+     * @return
+     */
+    public float getCurrentScale() {
+        float p[] = new float[9];
+        mCurMatrix.getValues(p);
+        float scale = Math.abs(p[Matrix.MSCALE_X]);
+        if(scale == 0){
+            scale = Math.abs(p[Matrix.MSKEW_X]);
+        }
+//        return p[Matrix.MPERSP_2];
+        return scale;
+    }
+
+    /**
+     * 获取当前图片的X偏移距离
+     */
+    public float getCurrentTransX() {
+        float p[] = new float[9];
+        mCurMatrix.getValues(p);
+        return p[Matrix.MTRANS_X];
+    }
+
+    /**
+     * 获取当前图片的Y偏移距离
+     */
+    public float getCurrentTransY() {
+        float p[] = new float[9];
+        mCurMatrix.getValues(p);
+        return p[Matrix.MTRANS_Y];
+    }
+
+    /**
+     * 获取当前Bitmap的Matrix
+     * @return
+     */
+    public Matrix getCurMatrix() {
+        return mCurMatrix;
+    }
+
+    /**
+     * 获取当前Bitmap的Rect
+     * @return
+     */
+    public RectF getCurrentRect() {
+        Matrix m = new Matrix();
+        m.set(mCurMatrix);
+        RectF rect = new RectF(0, 0, getBitmapWidth(), getBitmapHeight());
+        m.mapRect(rect);
+        return rect;
+    }
+
+    /**
+     * 获取当前View的Bitmap
+     * @return
+     */
+    public Bitmap getBitmap() {
+        return mBitmap;
+    }
+
+    /**
+     * 将图片居中显示
+     * @param horizontal
+     * @param vertical
+     */
+    public void center(final boolean horizontal, final boolean vertical) {
+        if(getHeight() <= 0 || getWidth() <= 0){
+            post(new Runnable() {
+
+                @Override
+                public void run() {
+                    doCenter(horizontal, vertical);
+                }
+            });
+        }else{
+            doCenter(horizontal, vertical);
+        }
+
+    }
+
+    void doCenter(boolean horizontal, boolean vertical){
+        if (isBitmapNotExists()) {
+            return;
+        }
+        RectF rect = getCurrentRect();
+        float deltaX = 0, deltaY = 0;
+        if (vertical) {
+            if (mCenterRegion != null) {
+                final float regionHeight = mCenterRegion.height();
+                if (rect.height() < regionHeight) {
+                    deltaY = (regionHeight - rect.height()) / 2 - rect.top + mCenterRegion.top;
+                } else if (rect.top > mCenterRegion.top) {
+                    deltaY = mCenterRegion.top - rect.top;
+                } else if (rect.bottom < mCenterRegion.bottom) {
+                    deltaY = mCenterRegion.bottom - rect.bottom ;
+                } else{
+                    deltaY = 0;
+                }
+            } else {
+                float ivHeight = getHeight();
+                if (rect.height() < ivHeight) {
+                    deltaY = (ivHeight - rect.height()) / 2 - rect.top;
+                } else if (rect.top > 0) {
+                    deltaY = -rect.top;
+                } else if (rect.bottom < ivHeight) {
+                    deltaY = ivHeight - rect.bottom;
+                } else if(rect.height() == ivHeight){
+                    deltaY = 0;
+                }
+            }
+        }
+
+        if (horizontal) {
+            float ivWidth = getWidth();
+            if (rect.width() < ivWidth) {
+                deltaX = (ivWidth - rect.width()) / 2 - rect.left;
+            } else if (rect.left > 0) {
+                deltaX = -rect.left;
+            } else if (rect.right < ivWidth) {
+                deltaX = ivWidth - rect.right;
+            } else if(rect.width() == ivWidth){
+                deltaX = 0;
+            }
+        }
+        mCurMatrix.postTranslate(deltaX, deltaY);
+    }
+
+    /**
+     * 设置图片的移动边界
+     * @param centerRegion
+     */
+    public void setCenterRegion(RectF centerRegion) {
+        this.mCenterRegion = centerRegion;
+    }
+
+
+    /**
+     * 是否可以双击放大缩小
+     * @param doubleClickDisable
+     */
+    public void setDoubleClickDisable(boolean doubleClickDisable) {
+        this.mIsDoubleClickDisabled = doubleClickDisable;
+    }
+    private boolean supSingleTapConfirmed = true;//是不是支持点击操作
+    public void setSupSingleTapConfirmed(boolean supSingleTapConfirmed) {
+        this.supSingleTapConfirmed = supSingleTapConfirmed;
+    }
+
+    @Override
+    public boolean onSingleTapConfirmed(MotionEvent e) {
+
+        if(this.onSingleTabListener != null){
+            this.onSingleTabListener.onSingleTab(e);
+        }
+
+        if (supSingleTapConfirmed) {
+            /*
+            TODO
+            if (getContext() instanceof PhotoActivity) {
+                ((PhotoActivity) getContext()).closeBitmap();
+            } else if (getContext() instanceof QuestionImageExplorer) {
+                ((QuestionImageExplorer) getContext()).closeBitmap();
+            }
+            */
+        }
+        return true;
+    }
+    /******************filing相关**************************/
+    //TODO 是否有用
+
+    /**
+     * Responsible for fling behavior. A FlingRunnable will keep re-posting
+     * itself until the fling is done.
+     */
+    private class FlingRunnable implements Runnable {
+        /**
+         * Tracks the decay of a fling scroll
+         */
+        private Scroller mScroller;
+
+        /**
+         * X value reported by mScroller on the previous fling
+         */
+        private int mLastFlingX;
+
+        /**
+         * Y value reported by mScroller on the previous fling
+         */
+        private int mLastFlingY;
+
+        public FlingRunnable() {
+            mScroller = new Scroller(getContext());
+        }
+
+        private void startCommon() {
+            // Remove any pending flings
+            removeCallbacks(this);
+        }
+
+        public void startUsingVelocity(int initialVelocityX, int initialVelocityY) {
+            if (initialVelocityX == 0 && initialVelocityY == 0)
+                return;
+
+            startCommon();
+
+            int initialX = initialVelocityX < 0 ? Integer.MAX_VALUE : 0;
+            mLastFlingX = initialX;
+
+            int initialY = initialVelocityY < 0 ? Integer.MAX_VALUE : 0;
+            mLastFlingY = initialY;
+
+            mScroller.fling(initialX, initialY, initialVelocityX, initialVelocityY, 0,
+                    Integer.MAX_VALUE, 0, Integer.MAX_VALUE);
+            post(this);
+        }
+
+        public void stop() {
+            removeCallbacks(this);
+            endFling();
+        }
+
+        private void endFling() {
+            mScroller.forceFinished(true);
+        }
+
+        public void run() {
+            if (isBitmapNotExists()) {
+                endFling();
+                return;
+            }
+
+            final Scroller scroller = mScroller;
+            boolean more = scroller.computeScrollOffset();
+            final int x = scroller.getCurrX();
+            final int y = scroller.getCurrY();
+
+            // Flip sign to convert finger direction to list items direction
+            // (e.g. finger moving down means list is moving towards the top)
+            int deltaX = x - mLastFlingX;
+            if (deltaX > 0) {
+                deltaX = Math.min(getWidth(), deltaX);
+            } else {
+                deltaX = Math.max(-getWidth(), deltaX);
+            }
+
+            int deltaY = y - mLastFlingY;
+            if (deltaY > 0) {
+                deltaY = Math.min(getHeight(), deltaY);
+            } else {
+                deltaY = Math.max(-getHeight(), deltaY);
+            }
+
+            trackMotionScroll(deltaX, deltaY);
+
+            if (more) {
+                mLastFlingX = x;
+                mLastFlingY = y;
+                post(this);
+            } else {
+                endFling();
+            }
+        }
+    }
+
+    void trackMotionScroll(int deltaX, int deltaY) {
+        mCurMatrix.set(mSavedMatrix);
+        mCurMatrix.postTranslate(deltaX, deltaY);
+
+        center(true, true);
+
+        setImageMatrixCenter();
+        mSavedMatrix.set(mCurMatrix);
+    }
+
+    /**
+     * bitmap是否已经不存在
+     * @return
+     */
+    boolean isBitmapNotExists() {
+        return mBitmap == null;
+    }
+
+    public int getBitmapWidth() {
+        if(mBitmap == null){
+            return 0;
+        }
+        return mBitmap.getWidth();
+    }
+
+    private int getBitmapHeight() {
+        if(mBitmap == null){
+            return 0;
+        }
+        return mBitmap.getHeight();
+    }
+    /**
+     * 是否已经滚动到最顶部
+     * @return
+     */
+    private boolean isScroolToTop() {
+        final RectF currentRect = getCurrentRect();
+        if (mCenterRegion == null) {
+            if (isOneScreen()) {
+                return currentRect.top > (getHeight() - currentRect.height()) / 2;
+            } else {
+                return currentRect.top >= 0;
+            }
+        } else {
+            if (isOneScreen()) {
+                return currentRect.top > (getHeight() - currentRect.height()) / 2;
+            } else {
+                return currentRect.top >= mCenterRegion.top;
+            }
+        }
+    }
+
+    /**
+     * 是否已经滚动到尾部
+     * @return
+     */
+    private boolean isScroolToBottom() {
+        final RectF currentRect = getCurrentRect();
+        if (mCenterRegion == null) {
+            if (isOneScreen()) {
+                return currentRect.bottom <= getHeight() / 2 + currentRect.height() / 2;
+            } else {
+                return currentRect.bottom <= getHeight();
+            }
+        } else {
+            if (isOneScreen()) {
+                return currentRect.bottom <= getHeight() / 2 + currentRect.height() / 2;
+            } else {
+                return currentRect.bottom <= mCenterRegion.bottom;
+            }
+        }
+    }
+
+    /**
+     * 当前屏幕是否已经将图片全屏显示
+     * @return
+     */
+    private boolean isOneScreen() {
+        final RectF currentRect = getCurrentRect();
+        if (mCenterRegion == null) {
+            return currentRect.height() < getHeight();
+        } else {
+            return currentRect.height() < mCenterRegion.height();
+        }
+    }
+
+    /**
+     * 用动画的效果滚动到中心点
+     */
+    private void startTranslateAnimation() {
+
+        if (!(isScroolToTop() || isScroolToBottom())) {
+            return;
+        }
+        final RectF currentRect = getCurrentRect();
+
+        float fromYDelta = 0;
+        float toYDelta = 0;
+
+        if (mCenterRegion == null) {
+            if (isScroolToTop()) {
+                if (isOneScreen()) {
+                    fromYDelta = currentRect.top - (getHeight() - currentRect.height()) / 2;
+                } else {
+                    fromYDelta = currentRect.top;
+                }
+                toYDelta = 0;
+            } else {
+                if (isOneScreen()) {
+                    fromYDelta = currentRect.bottom - getBottom() + (getHeight() - currentRect.height()) / 2;
+                } else {
+                    fromYDelta = currentRect.bottom - getBottom();
+                }
+                toYDelta = 0;
+            }
+        } else {
+            if (isScroolToTop()) {
+                if (isOneScreen()) {
+                    fromYDelta = currentRect.top - mCenterRegion.top - (mCenterRegion.height() - currentRect.height()) / 2;
+                } else {
+                    fromYDelta = currentRect.top - mCenterRegion.top;
+                }
+                toYDelta = 0;
+            } else {
+                if (isOneScreen()) {
+                    fromYDelta = currentRect.bottom - mCenterRegion.bottom + (mCenterRegion.height() - currentRect.height()) / 2;
+                } else {
+                    fromYDelta = currentRect.bottom - mCenterRegion.bottom;
+                }
+                toYDelta = 0;
+            }
+        }
+
+        TranslateAnimation trans = new TranslateAnimation(0, 0, fromYDelta, toYDelta);
+        trans.setFillAfter(false);
+        trans.setDuration(100);
+
+        final float distance = fromYDelta - toYDelta;
+
+        if (distance == 0) {
+            return;
+        }
+
+        mCurMatrix.set(mSavedMatrix);
+        mCurMatrix.postTranslate(0, distance);
+
+        center(true, true);
+
+        setImageMatrixCenter();
+        mSavedMatrix.set(mCurMatrix);
+        this.startAnimation(trans);
+    }
+
+    /*******************监听图片缩放相关******************/
+    private  OnBitmapScalChangedListener mOnBitmapScalChangedListener;
+
+    public void setOnBitmapScalChangedListener(OnBitmapScalChangedListener listener){
+        mOnBitmapScalChangedListener = listener;
+    }
+
+    /**
+     * 当bitmap的位置变化时通知选取框更新选取框位置
+     * @author chenmiao
+     *
+     */
+    public static interface OnBitmapScalChangedListener{
+        public void onScaleChanged(boolean enlarger, RectF rect);
+        public void onImageMove(RectF rect);
+    }
+
+
+    private OnSingleTabListener onSingleTabListener;
+
+    public void setOnSingleTabListener(OnSingleTabListener listener){
+        this.onSingleTabListener = listener;
+    }
+
+    public static interface OnSingleTabListener{
+        public void onSingleTab(MotionEvent event);
+    }
+
+    private OnZoomListener onZoomListener;
+
+    public void setOnZoomListener(OnZoomListener onZoomListener){
+        this.onZoomListener = onZoomListener;
+    }
+
+    public static interface OnZoomListener{
+        public void onZoomEnd();
+    }
+
+    public interface OnDrawListener {
+        void onDraw(ImageView img);
+    }
+}
