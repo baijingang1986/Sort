@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <com.baidu.homework.common.photo.core.SearchResultTouchImageView
+        android:id="@+id/search_many_questions_image"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <com.baidu.homework.common.photo.core.ImageDecorContainer
+        android:id="@+id/search_many_questions_decor"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <com.baidu.homework.activity.search.slide.animation.CustomCoordinatorLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+        <LinearLayout
+            android:id="@+id/admcc_container"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:elevation="16dp"
+            android:orientation="vertical"
+            app:behavior_peekHeight="48dp"
+            app:behavior_hideable="false"
+            app:layout_behavior="@string/view_pager_bottom_sheet_behavior"
+            android:visibility="invisible">
+
+            <android.support.design.widget.AppBarLayout
+                android:id="@+id/fl_search_app_bar_layout"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                app:elevation="0dp"
+                android:background="@drawable/many_search_sliding_place_bg">
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+                    <ImageView
+                        android:layout_width="32dp"
+                        android:layout_height="3dp"
+                        android:layout_marginTop="6dp"
+                        android:layout_gravity="center_horizontal"
+                        android:background="@drawable/many_search_sliding_place_small_bg"/>
+                    <com.baidu.homework.activity.search.manyquestions.ManyQuestionsPagerSlidingTabStrip
+                        android:id="@+id/search_pager_sliding"
+                        android:layout_width="match_parent"
+                        android:layout_height="25dp"
+                        android:layout_marginTop="15dp"
+                        android:layout_marginLeft="20dp"
+                        android:layout_marginRight="20dp"
+                        android:background="#FFFFFF" />
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1px"
+                        android:background="#E0E0E0"
+                        android:layout_gravity="bottom"
+                        />
+                </FrameLayout>
+            </android.support.design.widget.AppBarLayout>
+
+            <!--答案部分-->
+            <com.baidu.homework.activity.search.core.SearchResultPager
+                android:id="@+id/search_pager"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="#FFFFFF"
+                android:layout_gravity="center_horizontal|bottom"
+                app:layout_behavior="@string/scrolling_view_behavior" />
+        </LinearLayout>
+    </com.baidu.homework.activity.search.slide.animation.CustomCoordinatorLayout>
+
+    <com.baidu.homework.activity.search.ScanView
+        android:id="@+id/asas_scan_anim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"/>
+</FrameLayout>
